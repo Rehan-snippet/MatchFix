@@ -1,18 +1,19 @@
 -- =====================================================================
 -- MatchFix — sample seed data
 -- Password for every seeded user is: Passw0rd!
--- (bcrypt hash below is pre-computed so you don't need the API running)
+-- (bcrypt hash below is a real, pre-computed hash — verified to match
+-- "Passw0rd!" — so you don't need the API running to seed data)
 -- =====================================================================
 
 BEGIN;
 
 -- Passw0rd!  ->  bcrypt, 10 rounds
 INSERT INTO users (name, email, phone, password_hash) VALUES
-  ('Naeemul Haque',  'naeemul@matchfix.dev', '01700000001', '$2a$10$CwTycUXWue0Thq9StjUM0uJ8m0OKl3fF9tj6c0ZgJhKZzX0aQwmXG'),
-  ('Nahid Rajon',     'nahid@matchfix.dev',   '01700000002', '$2a$10$CwTycUXWue0Thq9StjUM0uJ8m0OKl3fF9tj6c0ZgJhKZzX0aQwmXG'),
-  ('Turf Runners Ltd','turfrunners@matchfix.dev','01700000003', '$2a$10$CwTycUXWue0Thq9StjUM0uJ8m0OKl3fF9tj6c0ZgJhKZzX0aQwmXG'),
-  ('Gear Bazaar',     'gearbazaar@matchfix.dev','01700000004', '$2a$10$CwTycUXWue0Thq9StjUM0uJ8m0OKl3fF9tj6c0ZgJhKZzX0aQwmXG'),
-  ('Rafi Chowdhury',  'rafi@matchfix.dev',    '01700000005', '$2a$10$CwTycUXWue0Thq9StjUM0uJ8m0OKl3fF9tj6c0ZgJhKZzX0aQwmXG');
+  ('Naeemul Haque',  'naeemul@matchfix.dev', '01700000001', '$2b$10$speT22nGoWSS.pzZBalc6.Zda3pwvUJ96cSVjSHVX7T6LHOK1r9ra'),
+  ('Nahid Rajon',     'nahid@matchfix.dev',   '01700000002', '$2b$10$speT22nGoWSS.pzZBalc6.Zda3pwvUJ96cSVjSHVX7T6LHOK1r9ra'),
+  ('Turf Runners Ltd','turfrunners@matchfix.dev','01700000003', '$2b$10$speT22nGoWSS.pzZBalc6.Zda3pwvUJ96cSVjSHVX7T6LHOK1r9ra'),
+  ('Gear Bazaar',     'gearbazaar@matchfix.dev','01700000004', '$2b$10$speT22nGoWSS.pzZBalc6.Zda3pwvUJ96cSVjSHVX7T6LHOK1r9ra'),
+  ('Rafi Chowdhury',  'rafi@matchfix.dev',    '01700000005', '$2b$10$speT22nGoWSS.pzZBalc6.Zda3pwvUJ96cSVjSHVX7T6LHOK1r9ra');
 
 -- user 3 = organizer, user 4 = seller, user 5 = customer, user 1 = organizer+customer (overlapping)
 INSERT INTO organizers (user_id, trade_licence, payout_account) VALUES
