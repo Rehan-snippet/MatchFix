@@ -1,36 +1,28 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+require('dotenv').config();
 
-const pool = require("./db");
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+
+const routes = require('./src/routes');
+const { notFound, errorHandler } = require('./src/middleware/errorHandler');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
 app.use(express.json());
+app.use(morgan('dev'));
 
-app.get("/", (req, res) => {
-    res.send("MatchFix backend is running!");
-});
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'matchfix-api' }));
 
-// Database test route
-app.get("/db-test", async (req, res) => {
-    try {
-        const result = await pool.query("SELECT NOW()");
-        res.json({
-            message: "Database connected!",
-            time: result.rows[0].now
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            message: "Database connection failed"
-        });
-    }
-});
+app.use('/api', routes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`MatchFix API listening on http://localhost:${PORT}`);
 });
+
+module.exports = app;
