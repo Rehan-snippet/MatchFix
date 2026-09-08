@@ -1,74 +1,282 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
+import {
+  Package,
+  MapPin,
+  Clock,
+  Star,
+  ShoppingBag,
+  ArrowRight,
+  CheckCircle2,
+  Truck,
+  X,
+} from 'lucide-react';
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busyKey, setBusyKey] = useState(null);
+
+  // Review modal state
+  const [reviewModal, setReviewModal] = useState({
+    open: false,
+    orderId: null,
+    productId: null,
+    itemTitle: '',
+    rating: 5,
+    comment: '',
+  });
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   function load() {
     setLoading(true);
     api
       .get('/orders/mine')
-      .then((res) => setOrders(res.data))
+      .then((res) => setOrders(res.data || []))
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
 
-  async function handleReview(orderId, productId) {
-    const rating = Number(prompt('Rate this product 1-5'));
-    if (!rating) return;
-    const comment = prompt('Leave a comment (optional)') || '';
-    const key = `${orderId}-${productId}`;
-    setBusyKey(key);
+  async function submitReview(e) {
+    e.preventDefault();
+    setReviewBusy(true);
+    setReviewError('');
     try {
-      await api.post(`/orders/${orderId}/items/${productId}/review`, { rating, comment });
-      alert('Thanks for the review!');
+      await api.post(
+        `/orders/${reviewModal.orderId}/items/${reviewModal.productId}/review`,
+        {
+          rating: reviewModal.rating,
+          comment: reviewModal.comment,
+        }
+      );
+      setReviewModal({
+        open: false,
+        orderId: null,
+        productId: null,
+        itemTitle: '',
+        rating: 5,
+        comment: '',
+      });
+      load();
     } catch (err) {
-      alert(err.response?.data?.error || 'Could not submit review');
+      setReviewError(err.response?.data?.error || 'Could not submit product review.');
     } finally {
-      setBusyKey(null);
+      setReviewBusy(false);
     }
   }
 
-  if (loading) return <p>Loading…</p>;
-
   return (
-    <div>
-      <h2>My Orders</h2>
-      {orders.length === 0 ? (
-        <p className="muted">No orders yet — go shop the marketplace!</p>
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 text-xs font-bold text-[#16a34a] uppercase tracking-wider mb-1.5">
+          <ShoppingBag className="w-3.5 h-3.5" />
+          <span>MatchFix Marketplace Purchases</span>
+        </div>
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
+          My Gear Orders
+        </h1>
+        <p className="mt-1 text-xs sm:text-sm text-neutral-500">
+          Track delivery dispatch, shipping addresses, and review your gear.
+        </p>
+      </div>
+
+      {/* Orders List */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="animate-pulse h-36 bg-neutral-100 rounded-3xl border border-neutral-200" />
+          ))}
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-20 bg-neutral-50 border border-neutral-200 rounded-3xl p-8 max-w-md mx-auto">
+          <Package className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-neutral-800">No orders found</h3>
+          <p className="mt-1 text-xs text-neutral-500">
+            You haven’t ordered any gear from the marketplace yet.
+          </p>
+          <Link
+            to="/marketplace"
+            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#16a34a] text-white text-xs font-bold shadow-xs hover:bg-[#15803d] transition"
+          >
+            <span>Explore Gear</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       ) : (
-        <div className="list">
+        <div className="space-y-6">
           {orders.map((o) => (
-            <div key={o.order_id} className="card">
-              <div className="card-row">
-                <strong>Order #{o.order_id}</strong>
-                <span>৳{o.total}</span>
+            <div
+              key={o.order_id}
+              className="bg-white border border-neutral-200/90 rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition duration-200 space-y-5"
+            >
+              {/* Order Top Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-neutral-100">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs font-bold text-neutral-500">
+                    Order #{o.order_id.slice(0, 8)}
+                  </span>
+                  <span className="text-xs text-neutral-400">·</span>
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-600">
+                    <MapPin className="w-3.5 h-3.5 text-neutral-400" />
+                    <span>{o.delivery_address}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-500 font-medium">Order Total:</span>
+                  <span className="text-base font-black text-neutral-900">
+                    ৳{Number(o.total).toLocaleString()}
+                  </span>
+                </div>
               </div>
-              <p className="muted">Deliver to: {o.delivery_address}</p>
-              <ul>
-                {o.items.map((item) => (
-                  <li key={item.product_id} className="card-row">
-                    <span>
-                      {item.title} × {item.qty} — ৳{item.unit_price} each
-                    </span>
-                    <span className="badge">{item.status}</span>
-                    {item.status === 'delivered' && (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        disabled={busyKey === `${o.order_id}-${item.product_id}`}
-                        onClick={() => handleReview(o.order_id, item.product_id)}
+
+              {/* Items in this order */}
+              <div className="divide-y divide-neutral-100">
+                {o.items?.map((item) => (
+                  <div
+                    key={item.product_id}
+                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400 flex-shrink-0">
+                        <Package className="w-5 h-5 text-[#16a34a]" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-neutral-900">{item.title}</h4>
+                        <p className="text-xs text-neutral-500">
+                          Qty: {item.qty} × ৳{Number(item.unit_price).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          item.status === 'delivered'
+                            ? 'bg-green-50 text-[#16a34a] border border-green-200'
+                            : item.status === 'shipped'
+                            ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                            : 'bg-neutral-100 text-neutral-600'
+                        }`}
                       >
-                        Rate
-                      </button>
-                    )}
-                  </li>
+                        {item.status}
+                      </span>
+
+                      {item.status === 'delivered' && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReviewModal({
+                              open: true,
+                              orderId: o.order_id,
+                              productId: item.product_id,
+                              itemTitle: item.title,
+                              rating: 5,
+                              comment: '',
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-xl border border-neutral-300 hover:border-neutral-900 text-neutral-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                          <span>Review</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-neutral-900">Review Gear</h3>
+              <button
+                type="button"
+                onClick={() => setReviewModal({ ...reviewModal, open: false })}
+                className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-500">
+              Reviewing: <strong className="text-neutral-900">{reviewModal.itemTitle}</strong>
+            </p>
+
+            {reviewError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {reviewError}
+              </div>
+            )}
+
+            <form onSubmit={submitReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-2">Rating</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setReviewModal({ ...reviewModal, rating: star })}
+                      className="p-1 cursor-pointer transition hover:scale-110"
+                    >
+                      <Star
+                        className={`w-7 h-7 ${
+                          star <= reviewModal.rating
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-neutral-200'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 text-sm font-bold text-neutral-800">
+                    {reviewModal.rating} of 5
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">
+                  Comments & Feedback
+                </label>
+                <textarea
+                  rows={3}
+                  value={reviewModal.comment}
+                  onChange={(e) =>
+                    setReviewModal({ ...reviewModal, comment: e.target.value })
+                  }
+                  placeholder="How was the product quality and fit?"
+                  className="w-full p-3 rounded-2xl border border-neutral-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewModal({ ...reviewModal, open: false })}
+                  className="px-4 py-2.5 rounded-2xl text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewBusy}
+                  className="px-5 py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                >
+                  {reviewBusy ? 'Submitting…' : 'Submit Review'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

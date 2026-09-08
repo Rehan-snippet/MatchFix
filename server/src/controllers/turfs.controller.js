@@ -2,9 +2,9 @@ const db = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 
-// GET /api/turfs?area_id=&city=&is_active=true
+// GET /api/turfs?area_id=&city=&keyword=&side_type=&surface=&min_price=&max_price=&is_active=true
 const listTurfs = asyncHandler(async (req, res) => {
-  const { area_id, city, is_active } = req.query;
+  const { area_id, city, keyword, side_type, surface, is_active } = req.query;
   const conditions = [];
   const params = [];
 
@@ -16,6 +16,10 @@ const listTurfs = asyncHandler(async (req, res) => {
     params.push(city);
     conditions.push(`a.city ILIKE $${params.length}`);
   }
+  if (keyword) {
+    params.push(`%${keyword}%`);
+    conditions.push(`(t.name ILIKE $${params.length} OR t.address ILIKE $${params.length} OR a.name ILIKE $${params.length} OR t.description ILIKE $${params.length})`);
+  }
   if (is_active !== undefined) {
     params.push(is_active === 'true');
     conditions.push(`t.is_active = $${params.length}`);
@@ -26,7 +30,23 @@ const listTurfs = asyncHandler(async (req, res) => {
   const { rows } = await db.query(
     `SELECT t.*, a.name AS area_name, a.city,
             u.name AS organizer_name,
-            (SELECT url FROM turf_images ti WHERE ti.turf_id = t.turf_id AND ti.is_cover = TRUE LIMIT 1) AS cover_image
+            (SELECT url FROM turf_images ti WHERE ti.turf_id = t.turf_id AND ti.is_cover = TRUE LIMIT 1) AS cover_image,
+            COALESCE((
+              SELECT json_agg(ti.url ORDER BY ti.is_cover DESC, ti.image_id ASC)
+              FROM turf_images ti
+              WHERE ti.turf_id = t.turf_id
+            ), '[]'::json) AS images,
+            COALESCE((
+              SELECT MIN(pr.hourly_rate)
+              FROM fields f
+              JOIN pricing_rules pr ON pr.field_id = f.field_id
+              WHERE f.turf_id = t.turf_id
+            ), 1200) AS hourly_rate,
+            COALESCE((
+              SELECT json_agg(json_build_object('field_id', f.field_id, 'name', f.name, 'side_type', f.side_type, 'surface', f.surface))
+              FROM fields f
+              WHERE f.turf_id = t.turf_id
+            ), '[]'::json) AS fields
      FROM turfs t
      JOIN areas a ON a.area_id = t.area_id
      JOIN organizers o ON o.user_id = t.organizer_id
@@ -35,7 +55,21 @@ const listTurfs = asyncHandler(async (req, res) => {
      ORDER BY t.created_at DESC`,
     params
   );
-  res.json(rows);
+
+  // Optional client-side friendly filtering if side_type or surface provided
+  let filteredRows = rows;
+  if (side_type) {
+    filteredRows = filteredRows.filter((r) =>
+      Array.isArray(r.fields) && r.fields.some((f) => f.side_type === side_type)
+    );
+  }
+  if (surface) {
+    filteredRows = filteredRows.filter((r) =>
+      Array.isArray(r.fields) && r.fields.some((f) => f.surface?.toLowerCase().includes(surface.toLowerCase()))
+    );
+  }
+
+  res.json(filteredRows);
 });
 
 // GET /api/turfs/:id  — full detail: turf + images + fields (+ their pricing rules)

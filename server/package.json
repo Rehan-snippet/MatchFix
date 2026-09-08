@@ -8,7 +8,9 @@
     "dev": "nodemon server.js",
     "db:create": "node scripts/createDb.js",
     "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed.js"
+    "db:seed": "node scripts/seed.js",
+    "db:seed:dhaka": "node scripts/seedDhaka.js",
+    "db:seed:marketplace": "node scripts/seedMarketplace.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

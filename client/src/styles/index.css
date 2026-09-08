@@ -31,6 +31,17 @@ a {
   padding: 24px 20px 80px;
 }
 
+.app-main {
+  width: 100%;
+  min-height: calc(100vh - 80px);
+}
+
+.app-main > div:not([class*="w-full"]):not([class*="max-w-"]) {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
 /* Navbar */
 .navbar {
   display: flex;
@@ -402,3 +413,69 @@ select {
 .list {
   margin-top: 12px;
 }
+
+/* Airbnb Map & Price Markers */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.airbnb-price-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  color: #222222;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 5px 9px;
+  border-radius: 9999px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.airbnb-price-pin:hover,
+.airbnb-price-pin.active {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #15803d !important;
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
+  z-index: 1000 !important;
+}
+
+.airbnb-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  border: 1px solid #e5e7eb;
+}
+
+.airbnb-popup .leaflet-popup-content {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.airbnb-popup a.leaflet-popup-close-button {
+  top: 8px;
+  right: 8px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  font-size: 18px;
+  z-index: 10;
+}
+
+/* Hide scrollbar for horizontal category pills */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
