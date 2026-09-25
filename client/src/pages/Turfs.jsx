@@ -14,6 +14,7 @@ export default function Turfs() {
   const [turfs, setTurfs] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
 
@@ -71,15 +72,19 @@ export default function Turfs() {
 
   // Fetch areas
   useEffect(() => {
-    api.get('/areas').then((res) => setAreas(res.data)).catch(() => {});
+    api
+      .get('/areas')
+      .then((res) => setAreas(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => console.error('Failed to load areas in Turfs:', err));
   }, []);
 
   // Fetch turfs from API
   useEffect(() => {
     setLoading(true);
+    setFetchError('');
     const params = { page };
     if (areaId) params.area_id = areaId;
-    if (keyword) params.keyword = keyword;
+    if (keyword) params.search = keyword;
 
     api
       .get('/turfs', { params })
@@ -92,7 +97,10 @@ export default function Turfs() {
           setPagination(res.data.pagination || null);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error('Failed to fetch turfs:', err);
+        setFetchError('Could not load turfs. Please check your connection and try again.');
+      })
       .finally(() => setLoading(false));
   }, [areaId, keyword, page]);
 
@@ -241,6 +249,19 @@ export default function Turfs() {
               mobileView === 'map' ? 'hidden lg:block' : 'block'
             }`}
           >
+            {fetchError && (
+              <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-between">
+                <span>{fetchError}</span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p)}
+                  className="px-3 py-1 rounded-xl bg-rose-600 text-white font-bold hover:bg-rose-700 transition"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[1, 2, 3, 4].map((n) => (

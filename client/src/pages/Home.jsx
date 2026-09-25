@@ -36,8 +36,8 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([
-      api.get('/turfs').then((res) => res.data),
-      api.get('/products').then((res) => res.data).catch(() => []),
+      api.get('/turfs').then((res) => (Array.isArray(res.data) ? res.data : res.data?.data || [])).catch(() => []),
+      api.get('/products').then((res) => (Array.isArray(res.data) ? res.data : res.data?.data || [])).catch(() => []),
     ])
       .then(([turfList, productList]) => {
         setTurfs(turfList);

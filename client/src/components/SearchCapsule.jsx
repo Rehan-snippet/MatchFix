@@ -27,9 +27,17 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
   useEffect(() => {
     api
       .get("/areas")
-      .then((res) => setAreas(res.data))
-      .catch(() => {});
+      .then((res) => setAreas(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => console.error("Failed to load Dhaka areas:", err));
   }, []);
+
+  // Sync state whenever URL query params change
+  useEffect(() => {
+    setSelectedArea(searchParams.get("area_id") || "");
+    setSelectedDate(searchParams.get("date") || "");
+    setSelectedFormat(searchParams.get("side_type") || "");
+    setSearchKeyword(searchParams.get("keyword") || "");
+  }, [searchParams]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

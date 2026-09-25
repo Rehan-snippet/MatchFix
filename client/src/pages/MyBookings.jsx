@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import Pagination from '../components/Pagination';
+import ReviewModal from '../components/ReviewModal';
+import { useToast } from '../context/ToastContext';
 import {
   Calendar,
   Clock,
@@ -18,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function MyBookings() {
+  const toast = useToast();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -27,9 +30,7 @@ export default function MyBookings() {
   const [pagination, setPagination] = useState(null);
 
   // Review modal state
-  const [reviewModal, setReviewModal] = useState({ open: false, bookingId: null, rating: 5, comment: '' });
-  const [reviewBusy, setReviewBusy] = useState(false);
-  const [reviewError, setReviewError] = useState('');
+  const [reviewModal, setReviewModal] = useState({ open: false, bookingId: null, turfName: '' });
 
   function load(pageNum = page) {
     setLoading(true);
@@ -52,11 +53,14 @@ export default function MyBookings() {
   }, [page]);
 
   async function handleCancel(id) {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    if (!window.confirm('Are you sure you want to cancel this booking?')) return;
     setBusyId(id);
     try {
       await api.patch(`/bookings/${id}/cancel`, { cancel_reason: 'Cancelled by customer' });
+      toast.success('Booking cancelled successfully.');
       load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not cancel booking.');
     } finally {
       setBusyId(null);
     }
@@ -66,22 +70,13 @@ export default function MyBookings() {
     setPaymentBooking(booking);
   }
 
-  async function submitReview(e) {
-    e.preventDefault();
-    setReviewBusy(true);
-    setReviewError('');
-    try {
-      await api.post(`/bookings/${reviewModal.bookingId}/review`, {
-        rating: reviewModal.rating,
-        comment: reviewModal.comment,
-      });
-      setReviewModal({ open: false, bookingId: null, rating: 5, comment: '' });
-      load();
-    } catch (err) {
-      setReviewError(err.response?.data?.error || 'Could not submit review.');
-    } finally {
-      setReviewBusy(false);
-    }
+  async function handleReviewSubmit({ rating, comment }) {
+    await api.post(`/bookings/${reviewModal.bookingId}/review`, {
+      rating,
+      comment,
+    });
+    toast.success('Thank you! Your turf review has been published.');
+    load();
   }
 
   const filtered = bookings.filter((b) => {
@@ -231,8 +226,7 @@ export default function MyBookings() {
                       setReviewModal({
                         open: true,
                         bookingId: b.booking_id,
-                        rating: 5,
-                        comment: '',
+                        turfName: b.slots?.[0]?.turf_name || 'Turf Venue',
                       })
                     }
                     className="px-4 py-2.5 rounded-2xl border border-neutral-300 hover:border-neutral-800 text-neutral-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
@@ -267,92 +261,15 @@ export default function MyBookings() {
         }}
       />
 
-      {/* Review Modal (Airbnb Modal Style) */}
-      {reviewModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-neutral-900">Rate this Turf</h3>
-              <button
-                type="button"
-                onClick={() => setReviewModal({ ...reviewModal, open: false })}
-                className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-500 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-neutral-500">
-              Share your feedback regarding the pitch surface, lighting, and locker facilities.
-            </p>
-
-            {reviewError && (
-              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-                {reviewError}
-              </div>
-            )}
-
-            <form onSubmit={submitReview} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-2">Rating</label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      type="button"
-                      key={star}
-                      onClick={() => setReviewModal({ ...reviewModal, rating: star })}
-                      className="p-1 cursor-pointer transition hover:scale-110"
-                    >
-                      <Star
-                        className={`w-7 h-7 ${
-                          star <= reviewModal.rating
-                            ? 'text-amber-400 fill-amber-400'
-                            : 'text-neutral-200'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                  <span className="ml-2 text-sm font-bold text-neutral-800">
-                    {reviewModal.rating} of 5
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1.5">
-                  Comments & Details
-                </label>
-                <textarea
-                  rows={3}
-                  value={reviewModal.comment}
-                  onChange={(e) =>
-                    setReviewModal({ ...reviewModal, comment: e.target.value })
-                  }
-                  placeholder="How was the turf experience? (Optional)"
-                  className="w-full p-3 rounded-2xl border border-neutral-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReviewModal({ ...reviewModal, open: false })}
-                  className="px-4 py-2.5 rounded-2xl text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={reviewBusy}
-                  className="px-5 py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition cursor-pointer"
-                >
-                  {reviewBusy ? 'Submitting…' : 'Submit Review'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Shared Review Modal */}
+      <ReviewModal
+        isOpen={reviewModal.open}
+        title={reviewModal.turfName ? `Rate ${reviewModal.turfName}` : 'Rate this Turf'}
+        subtitle="Share your feedback regarding the pitch surface, lighting, and locker facilities."
+        commentPlaceholder="How was the turf pitch and facility experience? (Optional)"
+        onSubmit={handleReviewSubmit}
+        onClose={() => setReviewModal({ open: false, bookingId: null, turfName: '' })}
+      />
 
       {/* Sandbox Payment Modal */}
       {paymentBooking && (

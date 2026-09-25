@@ -5,7 +5,8 @@ const { parsePagination, paginatedResponse } = require('../utils/paginate');
  * GET /api/turfs
  */
 async function listTurfs(req, res) {
-  const { area_id, min_rate, max_rate, search, all } = req.query;
+  const { area_id, min_rate, max_rate, search, keyword, all } = req.query;
+  const searchTerm = search || keyword;
 
   try {
     let queryText = `
@@ -48,8 +49,8 @@ async function listTurfs(req, res) {
       params.push(max_rate);
       queryText += ` AND t.hourly_rate <= $${params.length}`;
     }
-    if (search) {
-      params.push(`%${search}%`);
+    if (searchTerm) {
+      params.push(`%${searchTerm}%`);
       queryText += ` AND (t.name ILIKE $${params.length} OR t.address ILIKE $${params.length})`;
     }
 
