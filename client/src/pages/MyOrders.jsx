@@ -116,7 +116,7 @@ export default function MyOrders() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-neutral-100">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-neutral-500">
-                    Order #{o.order_id.slice(0, 8)}
+                    Order #{String(o.order_id).padStart(6, '0')}
                   </span>
                   <span className="text-xs text-neutral-400">·</span>
                   <div className="flex items-center gap-1.5 text-xs text-neutral-600">

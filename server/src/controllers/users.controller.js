@@ -27,57 +27,73 @@ const getMe = asyncHandler(async (req, res) => {
 });
 
 // PATCH /api/users/me — update base user fields
+// Uses explicit transaction control (withTransaction)
 const updateMe = asyncHandler(async (req, res) => {
   const { name, phone } = req.body;
-  const { rows } = await db.query(
-    `UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone)
-     WHERE user_id = $3
-     RETURNING user_id, name, email, phone, is_active, created_at`,
-    [name, phone, req.user.user_id]
-  );
-  res.json(rows[0]);
+  const user = await db.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone)
+       WHERE user_id = $3
+       RETURNING user_id, name, email, phone, is_active, created_at`,
+      [name, phone, req.user.user_id]
+    );
+    return rows[0];
+  });
+  res.json(user);
 });
 
 // POST /api/users/me/roles/organizer  { trade_licence, payout_account }
+// Uses explicit transaction control (withTransaction)
 const becomeOrganizer = asyncHandler(async (req, res) => {
   const { trade_licence, payout_account } = req.body;
-  const { rows } = await db.query(
-    `INSERT INTO organizers (user_id, trade_licence, payout_account)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (user_id) DO UPDATE
-       SET trade_licence = EXCLUDED.trade_licence, payout_account = EXCLUDED.payout_account
-     RETURNING *`,
-    [req.user.user_id, trade_licence || null, payout_account || null]
-  );
-  res.status(201).json(rows[0]);
+  const organizer = await db.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO organizers (user_id, trade_licence, payout_account)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE
+         SET trade_licence = EXCLUDED.trade_licence, payout_account = EXCLUDED.payout_account
+       RETURNING *`,
+      [req.user.user_id, trade_licence || null, payout_account || null]
+    );
+    return rows[0];
+  });
+  res.status(201).json(organizer);
 });
 
 // POST /api/users/me/roles/seller  { shop_name, payout_account }
+// Uses explicit transaction control (withTransaction)
 const becomeSeller = asyncHandler(async (req, res) => {
   const { shop_name, payout_account } = req.body;
   if (!shop_name) throw new ApiError(400, 'shop_name is required');
-  const { rows } = await db.query(
-    `INSERT INTO sellers (user_id, shop_name, payout_account)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (user_id) DO UPDATE
-       SET shop_name = EXCLUDED.shop_name, payout_account = EXCLUDED.payout_account
-     RETURNING *`,
-    [req.user.user_id, shop_name, payout_account || null]
-  );
-  res.status(201).json(rows[0]);
+  const seller = await db.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO sellers (user_id, shop_name, payout_account)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE
+         SET shop_name = EXCLUDED.shop_name, payout_account = EXCLUDED.payout_account
+       RETURNING *`,
+      [req.user.user_id, shop_name, payout_account || null]
+    );
+    return rows[0];
+  });
+  res.status(201).json(seller);
 });
 
 // POST /api/users/me/roles/customer  { default_address }
+// Uses explicit transaction control (withTransaction)
 const becomeCustomer = asyncHandler(async (req, res) => {
   const { default_address } = req.body;
-  const { rows } = await db.query(
-    `INSERT INTO customers (user_id, default_address)
-     VALUES ($1, $2)
-     ON CONFLICT (user_id) DO UPDATE SET default_address = EXCLUDED.default_address
-     RETURNING *`,
-    [req.user.user_id, default_address || null]
-  );
-  res.status(201).json(rows[0]);
+  const customer = await db.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO customers (user_id, default_address)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET default_address = EXCLUDED.default_address
+       RETURNING *`,
+      [req.user.user_id, default_address || null]
+    );
+    return rows[0];
+  });
+  res.status(201).json(customer);
 });
 
 module.exports = { getMe, updateMe, becomeOrganizer, becomeSeller, becomeCustomer };

@@ -41,7 +41,7 @@ export default function Home() {
     ])
       .then(([turfList, productList]) => {
         setTurfs(turfList);
-        setProducts(productList.slice(0, 4));
+        setProducts(productList.slice(0, 10));
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -209,10 +209,10 @@ export default function Home() {
                   <div className="aspect-square bg-neutral-100 overflow-hidden relative">
                     <img
                       src={
-                        p.images?.[0]?.url ||
+                        p.cover_image ||
                         'https://images.unsplash.com/photo-1511886929837-354d827aae26?w=600'
                       }
-                      alt={p.name}
+                      alt={p.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
                     <span className="absolute top-2 left-2 bg-white/90 text-neutral-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -220,8 +220,8 @@ export default function Home() {
                     </span>
                   </div>
                   <div className="p-3.5">
-                    <div className="text-xs text-neutral-500">{p.seller_name}</div>
-                    <div className="text-sm font-bold text-neutral-900 truncate mt-0.5">{p.name}</div>
+                    <div className="text-xs text-neutral-500">{p.shop_name}</div>
+                    <div className="text-sm font-bold text-neutral-900 truncate mt-0.5">{p.title}</div>
                     <div className="text-sm font-extrabold text-neutral-900 mt-1">
                       ৳{parseFloat(p.price).toLocaleString()}
                     </div>

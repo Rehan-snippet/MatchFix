@@ -1,100 +1,65 @@
-const fs = require('fs');
-const path = require('path');
 const { Pool } = require('pg');
+require('dotenv').config();
 
-let pool = null;
-let pgliteInstance = null;
-let dbType = null; // 'pool' | 'pglite'
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/matchfix',
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
 
-async function getDb() {
-  if (pool) return { type: 'pool', db: pool };
-  if (pgliteInstance) return { type: 'pglite', db: pgliteInstance };
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle database client', err);
+});
 
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
-    try {
-      pool = new Pool({ connectionString: process.env.DATABASE_URL });
-      await pool.query('SELECT 1');
-      console.log('Connected to external PostgreSQL via DATABASE_URL');
-      dbType = 'pool';
-      return { type: 'pool', db: pool };
-    } catch (err) {
-      console.warn('Could not connect to external PostgreSQL, falling back to embedded PostgreSQL:', err.message);
-      pool = null;
-    }
-  }
-
-  const { PGlite } = require('@electric-sql/pglite');
-  const { pgcrypto } = require('@electric-sql/pglite/contrib/pgcrypto');
-  const dataDir = path.join(process.cwd(), 'database', 'pgdata');
-  pgliteInstance = new PGlite(dataDir, { extensions: { pgcrypto } });
-  await pgliteInstance.waitReady;
-  dbType = 'pglite';
-  console.log('Connected to embedded PostgreSQL (PGlite) at', dataDir);
-  return { type: 'pglite', db: pgliteInstance };
-}
-
-async function initDb() {
-  const { type, db } = await getDb();
-  const checkSql = `SELECT to_regclass('public.users') as tbl;`;
-  const res = await query(checkSql);
-  const exists = res.rows && res.rows[0] && res.rows[0].tbl;
-  if (!exists) {
-    console.log('Applying MatchFix PostgreSQL database schema and seed data...');
-    const schemaPath = path.join(process.cwd(), 'database', 'schema.sql');
-    const seedPath = path.join(process.cwd(), 'database', 'seed.sql');
-
-    if (fs.existsSync(schemaPath)) {
-      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-      if (type === 'pglite') {
-        await db.exec(schemaSql);
-      } else {
-        await db.query(schemaSql);
-      }
-      console.log('PostgreSQL schema applied successfully.');
-    }
-    if (fs.existsSync(seedPath)) {
-      const seedSql = fs.readFileSync(seedPath, 'utf8');
-      if (type === 'pglite') {
-        await db.exec(seedSql);
-      } else {
-        await db.query(seedSql);
-      }
-      console.log('PostgreSQL seed data loaded successfully.');
-    }
-  } else {
-    console.log('MatchFix PostgreSQL database tables initialized.');
-  }
-
-  // Ensure diverse Dhaka areas and turfs with rich photos and coordinates exist
-  try {
-    const seedDhakaTurfs = require('./seedDhakaTurfs');
-    await seedDhakaTurfs(query);
-  } catch (err) {
-    console.warn('Could not run seedDhakaTurfs:', err.message);
-  }
-}
-
+/**
+ * Standard query helper for single statements (e.g., SELECT queries).
+ */
 async function query(text, params) {
-  const { db } = await getDb();
-  return await db.query(text, params);
+  const start = Date.now();
+  const res = await pool.query(text, params);
+  const duration = Date.now() - start;
+  if (process.env.DEBUG_SQL === 'true') {
+    console.log('Query executed', { text, duration, rowCount: res.rowCount });
+  }
+  return res;
 }
 
-async function getClient() {
-  const { type, db } = await getDb();
-  if (type === 'pool') {
-    return await db.connect();
+/**
+ * Check out a client from the pool.
+ */
+function getClient() {
+  return pool.connect();
+}
+
+/**
+ * Executes a callback within an explicit SQL transaction.
+ * Automatically issues BEGIN, commits on return, rolls back on exception,
+ * and releases the checked-out client back to the pool.
+ *
+ * @param {Function} callback - async (client) => any
+ * @returns {Promise<any>}
+ */
+async function withTransaction(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      console.error('Failed to rollback transaction:', rollbackErr);
+    }
+    throw err;
+  } finally {
+    client.release();
   }
-  return {
-    query: (text, params) => db.query(text, params),
-    release: () => {},
-  };
 }
 
 module.exports = {
+  pool,
   query,
   getClient,
-  get pool() {
-    return pool;
-  },
-  initDb,
+  withTransaction,
 };

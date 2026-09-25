@@ -1,9 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Menu, User, Globe, Trophy, ShoppingBag, ShieldCheck, LogOut, Calendar, Package, Database } from 'lucide-react';
-import AirbnbSearchCapsule from './SearchCapsule';
-import ErdModal from './ErdModal';
+import { useState, useRef, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  Menu,
+  User,
+  Globe,
+  Trophy,
+  ShoppingBag,
+  ShieldCheck,
+  LogOut,
+  Calendar,
+  Package,
+  Database,
+} from "lucide-react";
+import AirbnbSearchCapsule from "./SearchCapsule";
+import ErdModal from "./ErdModal";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -13,12 +24,12 @@ export default function Navbar() {
   const [erdOpen, setErdOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const isTurfsPage = location.pathname === '/turfs';
+  const isTurfsPage = location.pathname === "/turfs";
 
   function handleLogout() {
     logout();
     setMenuOpen(false);
-    navigate('/');
+    navigate("/");
   }
 
   // Close menu when clicking outside
@@ -28,8 +39,8 @@ export default function Navbar() {
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -38,7 +49,11 @@ export default function Navbar() {
         <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
             {/* 1. Left: OG Brand Logo with green Fix */}
-            <Link to="/" className="flex items-center gap-2 flex-shrink-0 group" id="brand-logo">
+            <Link
+              to="/"
+              className="flex items-center gap-2 flex-shrink-0 group"
+              id="brand-logo"
+            >
               <span className="font-black text-2xl sm:text-3xl tracking-tight text-neutral-900 select-none">
                 Match<span className="text-[#16a34a]">Fix</span>!
               </span>
@@ -53,10 +68,14 @@ export default function Navbar() {
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Host a turf / Organizer link */}
               <Link
-                to={user?.roles?.includes('organizer') ? '/organizer' : '/turfs'}
+                to={
+                  user?.roles?.includes("organizer") ? "/organizer" : "/turfs"
+                }
                 className="hidden md:inline-flex text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3.5 py-2.5 rounded-full transition"
               >
-                {user?.roles?.includes('organizer') ? 'Organizer Studio' : 'Host your turf'}
+                {user?.roles?.includes("organizer")
+                  ? "Organizer Studio"
+                  : "Host your turf"}
               </Link>
 
               {/* Marketplace link */}
@@ -83,12 +102,16 @@ export default function Navbar() {
                   type="button"
                   onClick={() => setMenuOpen(!menuOpen)}
                   className={`flex items-center gap-3 p-1.5 pl-3 border border-neutral-300 hover:shadow-md rounded-full transition cursor-pointer ${
-                    menuOpen ? 'shadow-md border-neutral-900' : ''
+                    menuOpen ? "shadow-md border-neutral-900" : ""
                   }`}
                 >
                   <Menu className="w-4 h-4 text-neutral-700 stroke-[2.2]" />
                   <div className="w-7 h-7 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-xs uppercase overflow-hidden">
-                    {user ? user.name.slice(0, 1) : <User className="w-4 h-4 text-neutral-200" />}
+                    {user ? (
+                      user.name.slice(0, 1)
+                    ) : (
+                      <User className="w-4 h-4 text-neutral-200" />
+                    )}
                   </div>
                 </button>
 
@@ -98,8 +121,12 @@ export default function Navbar() {
                     {user ? (
                       <>
                         <div className="px-4 py-3 border-b border-neutral-100">
-                          <p className="font-bold text-neutral-900 truncate">{user.name}</p>
-                          <p className="text-xs text-neutral-500 truncate">{user.email}</p>
+                          <p className="font-bold text-neutral-900 truncate">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-neutral-500 truncate">
+                            {user.email}
+                          </p>
                         </div>
 
                         <div className="py-1">
@@ -140,7 +167,7 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
-                          <button
+                          {/* <button
                             type="button"
                             onClick={() => {
                               setErdOpen(true);
@@ -150,8 +177,8 @@ export default function Navbar() {
                           >
                             <Database className="w-4 h-4 text-[#16a34a]" />
                             <span>Entity Relationship Diagram</span>
-                          </button>
-                          {user.roles?.includes('organizer') && (
+                          </button> */}
+                          {user.roles?.includes("organizer") && (
                             <Link
                               to="/organizer"
                               onClick={() => setMenuOpen(false)}
@@ -161,7 +188,7 @@ export default function Navbar() {
                               <span>Organizer Dashboard</span>
                             </Link>
                           )}
-                          {user.roles?.includes('seller') && (
+                          {user.roles?.includes("seller") && (
                             <Link
                               to="/seller"
                               onClick={() => setMenuOpen(false)}
@@ -213,7 +240,7 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
-                          <button
+                          {/* <button
                             type="button"
                             onClick={() => {
                               setErdOpen(true);
@@ -223,7 +250,7 @@ export default function Navbar() {
                           >
                             <Database className="w-4 h-4 text-[#16a34a]" />
                             <span>Entity Relationship Diagram</span>
-                          </button>
+                          </button> */}
                           <Link
                             to="/turfs"
                             onClick={() => setMenuOpen(false)}

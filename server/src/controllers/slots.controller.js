@@ -1,92 +1,87 @@
 const db = require('../config/db');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
-const { assertOwnsField } = require('./fields.controller');
 
-// GET /api/slots?field_id=1&date=2026-08-20
-// Returns slots plus whether each one is currently reserved by an active
-// booking (so the client can grey out taken slots).
-const listSlots = asyncHandler(async (req, res) => {
+/**
+ * GET /api/slots?field_id=X&date=YYYY-MM-DD
+ */
+async function listSlots(req, res) {
   const { field_id, date } = req.query;
-  if (!field_id) throw new ApiError(400, 'field_id query param is required');
 
-  const conditions = ['s.field_id = $1'];
-  const params = [field_id];
-  if (date) {
-    params.push(date);
-    conditions.push(`s.slot_date = $${params.length}`);
+  if (!field_id || !date) {
+    return res.status(400).json({ error: 'field_id and date parameters are required.' });
   }
 
-  const { rows } = await db.query(
-    `SELECT s.*,
-            EXISTS (
-              SELECT 1 FROM booking_slots bs
-              JOIN bookings b ON b.booking_id = bs.booking_id
-              WHERE bs.field_id = s.field_id AND bs.slot_date = s.slot_date
-                AND bs.start_time = s.start_time AND b.status <> 'cancelled'
-            ) AS is_reserved
-     FROM slots s
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY s.slot_date, s.start_time`,
-    params
-  );
-  res.json(rows);
-});
-
-// POST /api/slots  (organizer)  { field_id, slot_date, start_time, end_time }
-const createSlot = asyncHandler(async (req, res) => {
-  const { field_id, slot_date, start_time, end_time } = req.body;
-  if (!field_id || !slot_date || !start_time || !end_time) {
-    throw new ApiError(400, 'field_id, slot_date, start_time and end_time are required');
-  }
-  await assertOwnsField(field_id, req.user.user_id);
-
-  const { rows } = await db.query(
-    `INSERT INTO slots (field_id, slot_date, start_time, end_time) VALUES ($1,$2,$3,$4) RETURNING *`,
-    [field_id, slot_date, start_time, end_time]
-  );
-  res.status(201).json(rows[0]);
-});
-
-// POST /api/slots/generate  (organizer)
-// Bulk-creates one-hour slots for a field across a date range, skipping any
-// that already exist. Handy so organizers don't have to click "add slot"
-// dozens of times.
-const generateSlots = asyncHandler(async (req, res) => {
-  const { field_id, start_date, end_date, start_hour = 6, end_hour = 23 } = req.body;
-  if (!field_id || !start_date || !end_date) {
-    throw new ApiError(400, 'field_id, start_date and end_date are required');
-  }
-  await assertOwnsField(field_id, req.user.user_id);
-
-  const client = await db.getClient();
   try {
-    await client.query('BEGIN');
-    let created = 0;
-    const cur = new Date(start_date);
-    const end = new Date(end_date);
-    while (cur <= end) {
-      const dateStr = cur.toISOString().slice(0, 10);
-      for (let h = start_hour; h < end_hour; h += 1) {
-        const startTime = `${String(h).padStart(2, '0')}:00`;
-        const endTime = `${String(h + 1).padStart(2, '0')}:00`;
-        const { rowCount } = await client.query(
-          `INSERT INTO slots (field_id, slot_date, start_time, end_time)
-           VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-          [field_id, dateStr, startTime, endTime]
-        );
-        created += rowCount;
-      }
-      cur.setDate(cur.getDate() + 1);
-    }
-    await client.query('COMMIT');
-    res.status(201).json({ created });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-});
+    const { rows } = await db.query(
+      `SELECT
+        s.field_id,
+        TO_CHAR(s.slot_date, 'YYYY-MM-DD') AS slot_date,
+        s.start_time,
+        s.end_time,
+        fn_get_hourly_rate(s.field_id, s.slot_date, s.start_time) AS hourly_rate,
+        EXISTS (
+          SELECT 1
+          FROM booking_slots bs
+          JOIN bookings b ON bs.booking_id = b.booking_id
+          WHERE bs.field_id = s.field_id
+            AND bs.slot_date = s.slot_date
+            AND bs.start_time = s.start_time
+            AND b.status <> 'cancelled'
+        ) AS is_reserved
+      FROM slots s
+      WHERE s.field_id = $1
+        AND s.slot_date = $2
+      ORDER BY s.start_time ASC`,
+      [field_id, date]
+    );
 
-module.exports = { listSlots, createSlot, generateSlots };
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/slots/generate
+ * DML 19: Standardized to withTransaction
+ */
+async function generateSlots(req, res) {
+  const { field_id, start_date, end_date } = req.body;
+
+  if (!field_id || !start_date || !end_date) {
+    return res.status(400).json({ error: 'field_id, start_date, and end_date are required.' });
+  }
+
+  try {
+    await db.withTransaction(async (client) => {
+      // Check organizer authorization
+      const check = await client.query(
+        `SELECT t.organizer_id FROM fields f JOIN turfs t ON f.turf_id = t.turf_id WHERE f.field_id = $1`,
+        [field_id]
+      );
+      if (!check.rows.length) throw new Error('Field not found.');
+      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+
+      await client.query(
+        `INSERT INTO slots (field_id, slot_date, start_time, end_time)
+         SELECT
+           $1::INT,
+           d::DATE,
+           (h || ':00:00')::TIME,
+           ((h + 1) || ':00:00')::TIME
+         FROM generate_series($2::DATE, $3::DATE, '1 day'::INTERVAL) d
+         CROSS JOIN generate_series(8, 22) h
+         ON CONFLICT (field_id, slot_date, start_time) DO NOTHING`,
+        [field_id, start_date, end_date]
+      );
+    });
+
+    return res.json({ message: 'Pitch slots generated successfully.' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+module.exports = {
+  listSlots,
+  generateSlots,
+};

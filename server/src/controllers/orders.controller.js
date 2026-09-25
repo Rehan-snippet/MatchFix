@@ -1,150 +1,281 @@
 const db = require('../config/db');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
-
-// POST /api/orders  (customer)
-// body: { items: [{ product_id, qty }], delivery_address, delivery_phone }
-// "places": Order always belongs to exactly one Customer.
-// "includes"/"listedAs": Order_Item borrows (order_id, product_id) as its
-// key — unit_price is snapshotted here so later Product.price changes
-// don't rewrite history.
-const createOrder = asyncHandler(async (req, res) => {
+/**
+ * POST /api/orders
+ * DML 31: Uses withTransaction to enforce ACID checkout.
+ * Row-locks products using FOR UPDATE, verifies stock, decrements inventory,
+ * and creates order + order_items atomically.
+ */
+async function createOrder(req, res) {
   const { items, delivery_address, delivery_phone } = req.body;
+
   if (!Array.isArray(items) || items.length === 0) {
-    throw new ApiError(400, 'items must be a non-empty array of { product_id, qty }');
+    return res.status(400).json({ error: 'Order must contain at least one item.' });
   }
-  if (!delivery_address) throw new ApiError(400, 'delivery_address is required');
+  if (!delivery_address) {
+    return res.status(400).json({ error: 'Delivery address is required.' });
+  }
 
-  const client = await db.getClient();
   try {
-    await client.query('BEGIN');
+    const order = await db.withTransaction(async (client) => {
+      let totalAmount = 0;
+      const verifiedItems = [];
 
-    let total = 0;
-    const priced = [];
-    for (const item of items) {
-      if (!item.product_id || !item.qty || item.qty < 1) {
-        throw new ApiError(400, 'Each item needs product_id and qty >= 1');
+      for (const item of items) {
+        const { product_id, qty } = item;
+        if (!product_id || !qty || qty <= 0) {
+          throw new Error('Each item must have a valid product_id and quantity > 0.');
+        }
+
+        // Lock row to prevent race conditions during concurrent orders
+        const { rows } = await client.query(
+          `SELECT product_id, title, price, stock
+           FROM products
+           WHERE product_id = $1
+           FOR UPDATE`,
+          [product_id]
+        );
+
+        if (!rows.length) throw new Error(`Product #${product_id} not found.`);
+        const prod = rows[0];
+
+        if (prod.stock < qty) {
+          throw new Error(`Insufficient stock for "${prod.title}". In stock: ${prod.stock}, requested: ${qty}.`);
+        }
+
+        const unitPrice = Number(prod.price);
+        totalAmount += unitPrice * qty;
+
+        // Decrement stock
+        await client.query(
+          `UPDATE products SET stock = stock - $1 WHERE product_id = $2`,
+          [qty, product_id]
+        );
+
+        verifiedItems.push({
+          product_id,
+          qty,
+          unit_price: unitPrice,
+        });
       }
-      const { rows } = await client.query(
-        'SELECT * FROM products WHERE product_id = $1 FOR UPDATE',
-        [item.product_id]
+
+      // Create Order
+      const orderRes = await client.query(
+        `INSERT INTO orders (customer_id, total_amount, status, delivery_address, delivery_phone)
+         VALUES ($1, $2, 'placed', $3, $4)
+         RETURNING *`,
+        [req.user.user_id, totalAmount, delivery_address, delivery_phone || null]
       );
-      const product = rows[0];
-      if (!product || !product.is_active) throw new ApiError(404, `Product ${item.product_id} not available`);
-      if (product.stock < item.qty) throw new ApiError(400, `Not enough stock for "${product.title}"`);
+      const createdOrder = orderRes.rows[0];
 
-      total += Number(product.price) * item.qty;
-      priced.push({ ...item, unit_price: product.price });
-    }
+      // Insert Order Items
+      for (const vItem of verifiedItems) {
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, qty, unit_price, status)
+           VALUES ($1, $2, $3, $4, 'placed')`,
+          [createdOrder.order_id, vItem.product_id, vItem.qty, vItem.unit_price]
+        );
+      }
 
-    const orderRes = await client.query(
-      `INSERT INTO orders (customer_id, total, delivery_address, delivery_phone)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [req.user.user_id, total, delivery_address, delivery_phone || null]
-    );
-    const order = orderRes.rows[0];
+      return createdOrder;
+    });
 
-    for (const item of priced) {
-      await client.query(
-        `INSERT INTO order_items (order_id, product_id, qty, unit_price) VALUES ($1,$2,$3,$4)`,
-        [order.order_id, item.product_id, item.qty, item.unit_price]
-      );
-      await client.query('UPDATE products SET stock = stock - $1 WHERE product_id = $2', [
-        item.qty,
-        item.product_id,
-      ]);
-    }
-
-    await client.query('COMMIT');
-    res.status(201).json(order);
+    return res.status(201).json({
+      order,
+      message: 'Order placed successfully. Please settle payment to confirm shipment.',
+    });
   } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    return res.status(400).json({ error: err.message });
   }
-});
-
-async function attachItems(orders) {
-  return Promise.all(
-    orders.map(async (order) => {
-      const { rows } = await db.query(
-        `SELECT oi.*, p.title, p.seller_id FROM order_items oi
-         JOIN products p ON p.product_id = oi.product_id
-         WHERE oi.order_id = $1`,
-        [order.order_id]
-      );
-      return { ...order, items: rows };
-    })
-  );
 }
 
-// GET /api/orders/mine  (customer)
-const listMyOrders = asyncHandler(async (req, res) => {
-  const { rows } = await db.query('SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC', [
-    req.user.user_id,
-  ]);
-  res.json(await attachItems(rows));
-});
+/**
+ * GET /api/orders/mine
+ */
+async function listMyOrders(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT
+        o.order_id,
+        o.total_amount,
+        o.status,
+        o.delivery_address,
+        o.delivery_phone,
+        o.created_at,
+        json_agg(
+          json_build_object(
+            'product_id', p.product_id,
+            'title', p.title,
+            'qty', oi.qty,
+            'unit_price', oi.unit_price,
+            'status', oi.status
+          )
+        ) AS items,
+        (
+          SELECT json_agg(json_build_object('payment_id', pay.payment_id, 'amount', pay.amount, 'status', pay.status))
+          FROM payments pay WHERE pay.order_id = o.order_id
+        ) AS payments
+      FROM orders o
+      JOIN order_items oi ON o.order_id = oi.order_id
+      JOIN products p ON oi.product_id = p.product_id
+      WHERE o.customer_id = $1
+      GROUP BY o.order_id
+      ORDER BY o.created_at DESC`,
+      [req.user.user_id]
+    );
 
-// GET /api/orders/for-my-products  (seller) — order lines containing their products
-const listOrdersForMyProducts = asyncHandler(async (req, res) => {
-  const { rows } = await db.query(
-    `SELECT oi.*, o.order_id, o.delivery_address, o.delivery_phone, o.created_at AS order_created_at,
-            p.title, u.name AS customer_name
-     FROM order_items oi
-     JOIN products p ON p.product_id = oi.product_id
-     JOIN orders o ON o.order_id = oi.order_id
-     JOIN customers c ON c.user_id = o.customer_id
-     JOIN users u ON u.user_id = c.user_id
-     WHERE p.seller_id = $1
-     ORDER BY o.created_at DESC`,
-    [req.user.user_id]
-  );
-  res.json(rows);
-});
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
 
-// PATCH /api/orders/:orderId/items/:productId/status  (seller) { status }
-const updateOrderItemStatus = asyncHandler(async (req, res) => {
+/**
+ * GET /api/orders/for-my-products
+ */
+async function listOrdersForMyProducts(req, res) {
+  try {
+    const { rows } = await db.query(
+      `SELECT
+        o.order_id,
+        o.status AS order_status,
+        o.created_at,
+        u.name AS customer_name,
+        u.phone AS customer_phone,
+        o.delivery_address,
+        oi.product_id,
+        p.title AS product_title,
+        oi.qty,
+        oi.unit_price,
+        oi.status AS item_status
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.order_id
+      JOIN products p ON oi.product_id = p.product_id
+      JOIN users u ON o.customer_id = u.user_id
+      WHERE p.seller_id = $1
+      ORDER BY o.created_at DESC`,
+      [req.user.user_id]
+    );
+
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/orders/:id/cancel
+ * DML 32: Uses withTransaction to cancel order and return reserved stock to products.
+ */
+async function cancelOrder(req, res) {
+  const { id } = req.params;
+
+  try {
+    await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT customer_id, status FROM orders WHERE order_id = $1 FOR UPDATE', [id]);
+      if (!check.rows.length) throw new Error('Order not found.');
+      const order = check.rows[0];
+
+      if (order.customer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (['cancelled', 'shipped', 'delivered'].includes(order.status)) {
+        throw new Error(`Cannot cancel order in "${order.status}" status.`);
+      }
+
+      // Restore product stock
+      const { rows: items } = await client.query(
+        'SELECT product_id, qty FROM order_items WHERE order_id = $1',
+        [id]
+      );
+      for (const item of items) {
+        await client.query(
+          'UPDATE products SET stock = stock + $1 WHERE product_id = $2',
+          [item.qty, item.product_id]
+        );
+      }
+
+      await client.query(`UPDATE orders SET status = 'cancelled' WHERE order_id = $1`, [id]);
+      await client.query(`UPDATE order_items SET status = 'cancelled' WHERE order_id = $1`, [id]);
+    });
+
+    return res.json({ message: 'Order cancelled successfully and stock restored.' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/orders/:id/status
+ * DML 33: Uses withTransaction
+ */
+async function updateOrderStatus(req, res) {
+  const { id } = req.params;
   const { status } = req.body;
-  const allowed = ['placed', 'confirmed', 'delivered', 'cancelled'];
-  if (!allowed.includes(status)) throw new ApiError(400, `status must be one of ${allowed.join(', ')}`);
 
-  const ownerCheck = await db.query(
-    `SELECT p.seller_id FROM order_items oi JOIN products p ON p.product_id = oi.product_id
-     WHERE oi.order_id = $1 AND oi.product_id = $2`,
-    [req.params.orderId, req.params.productId]
-  );
-  if (!ownerCheck.rows[0]) throw new ApiError(404, 'Order item not found');
-  if (ownerCheck.rows[0].seller_id !== req.user.user_id) throw new ApiError(403, 'Not your product');
+  const validStatuses = ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+  }
 
-  const { rows } = await db.query(
-    `UPDATE order_items SET status = $1 WHERE order_id = $2 AND product_id = $3 RETURNING *`,
-    [status, req.params.orderId, req.params.productId]
-  );
-  res.json(rows[0]);
-});
+  try {
+    await db.withTransaction(async (client) => {
+      const resUpdate = await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', [status, id]);
+      if (resUpdate.rowCount === 0) throw new Error('Order not found.');
+      await client.query('UPDATE order_items SET status = $1 WHERE order_id = $2', [status, id]);
+    });
 
-// POST /api/orders/:orderId/items/:productId/review  (owning customer) { rating, comment } -- "rated"
-const reviewOrderItem = asyncHandler(async (req, res) => {
+    return res.json({ message: `Order status updated to ${status}.` });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/orders/:orderId/products/:productId/review
+ * DML 34: Uses withTransaction
+ */
+async function addProductReview(req, res) {
+  const { orderId, productId } = req.params;
   const { rating, comment } = req.body;
-  if (!rating || rating < 1 || rating > 5) throw new ApiError(400, 'rating must be between 1 and 5');
 
-  const order = await db.query('SELECT * FROM orders WHERE order_id = $1', [req.params.orderId]);
-  if (!order.rows[0]) throw new ApiError(404, 'Order not found');
-  if (order.rows[0].customer_id !== req.user.user_id) throw new ApiError(403, 'Not your order');
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 5.' });
+  }
 
-  const { rows } = await db.query(
-    `INSERT INTO product_reviews (order_id, product_id, rating, comment) VALUES ($1,$2,$3,$4) RETURNING *`,
-    [req.params.orderId, req.params.productId, rating, comment || null]
-  );
-  res.status(201).json(rows[0]);
-});
+  try {
+    const review = await db.withTransaction(async (client) => {
+      // Validate customer purchased this product in this order
+      const { rows } = await client.query(
+        `SELECT o.customer_id, o.status
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         WHERE o.order_id = $1 AND oi.product_id = $2`,
+        [orderId, productId]
+      );
+
+      if (!rows.length) throw new Error('No purchase record found for this product in this order.');
+      if (rows[0].customer_id !== req.user.user_id) throw new Error('Unauthorized to review this order item.');
+      if (rows[0].status === 'cancelled') throw new Error('Cannot review a cancelled order.');
+
+      const resReview = await client.query(
+        `INSERT INTO product_reviews (order_id, product_id, rating, comment, created_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (order_id, product_id) DO UPDATE SET rating = $3, comment = $4
+         RETURNING *`,
+        [orderId, productId, rating, comment]
+      );
+      return resReview.rows[0];
+    });
+
+    return res.status(201).json(review);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
 
 module.exports = {
   createOrder,
   listMyOrders,
   listOrdersForMyProducts,
-  updateOrderItemStatus,
-  reviewOrderItem,
+  cancelOrder,
+  updateOrderStatus,
+  addProductReview,
 };

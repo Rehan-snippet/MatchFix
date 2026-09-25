@@ -1,143 +1,303 @@
 const db = require('../config/db');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
 
-// GET /api/products?category=&seller_id=&q=
-const listProducts = asyncHandler(async (req, res) => {
-  const { category, seller_id, q } = req.query;
-  const conditions = ['p.is_active = TRUE'];
-  const params = [];
+/**
+ * GET /api/products
+ */
+async function listProducts(req, res) {
+  const { category, condition, min_price, max_price, search } = req.query;
 
-  if (category) {
-    params.push(category);
-    conditions.push(`p.category ILIKE $${params.length}`);
+  try {
+    let queryText = `
+      SELECT
+        p.product_id,
+        p.title,
+        p.price,
+        p.category,
+        p.condition,
+        p.stock,
+        p.description,
+        p.created_at,
+        s.shop_name,
+        u.name AS seller_name,
+        COALESCE(
+          (SELECT ROUND(AVG(pr.rating)::NUMERIC, 2) FROM product_reviews pr WHERE pr.product_id = p.product_id),
+          NULL
+        ) AS average_rating,
+        (
+          SELECT pi.url FROM product_images pi
+          WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE
+          LIMIT 1
+        ) AS cover_image
+      FROM products p
+      JOIN sellers s ON p.seller_id = s.user_id
+      JOIN users u ON s.user_id = u.user_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (category) {
+      params.push(category);
+      queryText += ` AND p.category = $${params.length}`;
+    }
+    if (condition) {
+      params.push(condition);
+      queryText += ` AND p.condition = $${params.length}`;
+    }
+    if (min_price) {
+      params.push(min_price);
+      queryText += ` AND p.price >= $${params.length}`;
+    }
+    if (max_price) {
+      params.push(max_price);
+      queryText += ` AND p.price <= $${params.length}`;
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      queryText += ` AND (p.title ILIKE $${params.length} OR p.description ILIKE $${params.length})`;
+    }
+
+    queryText += ` ORDER BY p.created_at DESC`;
+
+    const { rows } = await db.query(queryText, params);
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
-  if (seller_id) {
-    params.push(seller_id);
-    conditions.push(`p.seller_id = $${params.length}`);
-  }
-  if (q) {
-    params.push(`%${q}%`);
-    conditions.push(`p.title ILIKE $${params.length}`);
-  }
-
-  const { rows } = await db.query(
-    `SELECT p.*, s.shop_name,
-            (SELECT url FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE LIMIT 1) AS cover_image,
-            (SELECT ROUND(AVG(pr.rating)::numeric, 1) FROM product_reviews pr
-               JOIN order_items oi ON oi.order_id = pr.order_id AND oi.product_id = pr.product_id
-               WHERE oi.product_id = p.product_id) AS avg_rating
-     FROM products p
-     JOIN sellers s ON s.user_id = p.seller_id
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY p.created_at DESC`,
-    params
-  );
-  res.json(rows);
-});
-
-// GET /api/products/:id  (+ images + reviews)
-const getProduct = asyncHandler(async (req, res) => {
-  const { rows } = await db.query(
-    `SELECT p.*, s.shop_name FROM products p JOIN sellers s ON s.user_id = p.seller_id WHERE p.product_id = $1`,
-    [req.params.id]
-  );
-  if (!rows[0]) throw new ApiError(404, 'Product not found');
-
-  const [images, reviews] = await Promise.all([
-    db.query('SELECT * FROM product_images WHERE product_id = $1 ORDER BY is_cover DESC, image_id', [req.params.id]),
-    db.query(
-      `SELECT pr.*, u.name AS reviewer_name FROM product_reviews pr
-       JOIN orders o ON o.order_id = pr.order_id
-       JOIN customers c ON c.user_id = o.customer_id
-       JOIN users u ON u.user_id = c.user_id
-       WHERE pr.product_id = $1 ORDER BY pr.created_at DESC`,
-      [req.params.id]
-    ),
-  ]);
-
-  res.json({ ...rows[0], images: images.rows, reviews: reviews.rows });
-});
-
-async function assertOwnsProduct(productId, sellerId) {
-  const { rows } = await db.query('SELECT * FROM products WHERE product_id = $1', [productId]);
-  if (!rows[0]) throw new ApiError(404, 'Product not found');
-  if (rows[0].seller_id !== sellerId) throw new ApiError(403, 'You do not own this product');
-  return rows[0];
 }
 
-// POST /api/products  (seller)
-const createProduct = asyncHandler(async (req, res) => {
-  const { title, category, description, price, condition, stock } = req.body;
-  if (!title || price === undefined) throw new ApiError(400, 'title and price are required');
+/**
+ * GET /api/products/:id
+ */
+async function getProduct(req, res) {
+  const { id } = req.params;
 
-  const { rows } = await db.query(
-    `INSERT INTO products (seller_id, title, category, description, price, condition, stock)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [req.user.user_id, title, category || null, description || null, price, condition || null, stock || 0]
-  );
-  res.status(201).json(rows[0]);
-});
-
-// PATCH /api/products/:id  (owning seller)
-const updateProduct = asyncHandler(async (req, res) => {
-  await assertOwnsProduct(req.params.id, req.user.user_id);
-  const { title, category, description, price, condition, stock, is_active } = req.body;
-
-  const { rows } = await db.query(
-    `UPDATE products SET
-       title = COALESCE($1,title), category = COALESCE($2,category), description = COALESCE($3,description),
-       price = COALESCE($4,price), condition = COALESCE($5,condition), stock = COALESCE($6,stock),
-       is_active = COALESCE($7,is_active)
-     WHERE product_id = $8 RETURNING *`,
-    [title, category, description, price, condition, stock, is_active, req.params.id]
-  );
-  res.json(rows[0]);
-});
-
-// DELETE /api/products/:id  (owning seller)
-const deleteProduct = asyncHandler(async (req, res) => {
-  await assertOwnsProduct(req.params.id, req.user.user_id);
-  await db.query('DELETE FROM products WHERE product_id = $1', [req.params.id]);
-  res.status(204).send();
-});
-
-// POST /api/products/:id/images  { url, is_cover }  -- "shows"
-const addProductImage = asyncHandler(async (req, res) => {
-  await assertOwnsProduct(req.params.id, req.user.user_id);
-  const { url, is_cover } = req.body;
-  if (!url) throw new ApiError(400, 'url is required');
-
-  const client = await db.getClient();
   try {
-    await client.query('BEGIN');
-    if (is_cover) {
-      await client.query('UPDATE product_images SET is_cover = FALSE WHERE product_id = $1', [req.params.id]);
-    }
-    const { rows } = await client.query(
-      'INSERT INTO product_images (product_id, url, is_cover) VALUES ($1,$2,$3) RETURNING *',
-      [req.params.id, url, !!is_cover]
+    const { rows } = await db.query(
+      `SELECT
+        p.*,
+        s.shop_name,
+        u.name AS seller_name,
+        (
+          SELECT json_agg(json_build_object('image_id', pi.image_id, 'url', pi.url, 'is_cover', pi.is_cover))
+          FROM product_images pi WHERE pi.product_id = p.product_id
+        ) AS images,
+        (
+          SELECT json_agg(json_build_object(
+            'review_id', pr.review_id,
+            'rating', pr.rating,
+            'comment', pr.comment,
+            'customer_name', cu.name,
+            'created_at', pr.created_at
+          ))
+          FROM product_reviews pr
+          JOIN orders o ON pr.order_id = o.order_id
+          JOIN users cu ON o.customer_id = cu.user_id
+          WHERE pr.product_id = p.product_id
+        ) AS reviews
+       FROM products p
+       JOIN sellers s ON p.seller_id = s.user_id
+       JOIN users u ON s.user_id = u.user_id
+       WHERE p.product_id = $1`,
+      [id]
     );
-    await client.query('COMMIT');
-    res.status(201).json(rows[0]);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-});
 
-// DELETE /api/products/:productId/images/:imageId
-const deleteProductImage = asyncHandler(async (req, res) => {
-  await assertOwnsProduct(req.params.productId, req.user.user_id);
-  const { rowCount } = await db.query(
-    'DELETE FROM product_images WHERE image_id = $1 AND product_id = $2',
-    [req.params.imageId, req.params.productId]
-  );
-  if (!rowCount) throw new ApiError(404, 'Image not found');
-  res.status(204).send();
-});
+    if (!rows.length) return res.status(404).json({ error: 'Product not found.' });
+    return res.json(rows[0]);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/products
+ * DML 25: Uses withTransaction
+ */
+async function createProduct(req, res) {
+  const { title, price, category, condition = 'new', stock = 0, description, cover_url } = req.body;
+
+  if (!title || price === undefined || !category) {
+    return res.status(400).json({ error: 'Title, price, and category are required.' });
+  }
+
+  try {
+    const product = await db.withTransaction(async (client) => {
+      const checkSeller = await client.query('SELECT user_id FROM sellers WHERE user_id = $1', [req.user.user_id]);
+      if (!checkSeller.rows.length) throw new Error('User does not have a verified Seller account.');
+
+      const { rows } = await client.query(
+        `INSERT INTO products (seller_id, title, price, category, condition, stock, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [req.user.user_id, title, price, category, condition, stock, description || null]
+      );
+      const newProduct = rows[0];
+
+      if (cover_url) {
+        await client.query(
+          `INSERT INTO product_images (product_id, url, is_cover) VALUES ($1, $2, TRUE)`,
+          [newProduct.product_id, cover_url]
+        );
+      }
+
+      return newProduct;
+    });
+
+    return res.status(201).json(product);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * PUT /api/products/:id
+ * DML 26: Uses withTransaction
+ */
+async function updateProduct(req, res) {
+  const { id } = req.params;
+  const { title, price, category, condition, stock, description } = req.body;
+
+  try {
+    const product = await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1 FOR UPDATE', [id]);
+      if (!check.rows.length) throw new Error('Product not found.');
+      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized: You do not own this product listing.');
+
+      const { rows } = await client.query(
+        `UPDATE products
+         SET title = COALESCE($1, title),
+             price = COALESCE($2, price),
+             category = COALESCE($3, category),
+             condition = COALESCE($4, condition),
+             stock = COALESCE($5, stock),
+             description = COALESCE($6, description)
+         WHERE product_id = $7
+         RETURNING *`,
+        [title, price, category, condition, stock, description, id]
+      );
+      return rows[0];
+    });
+
+    return res.json(product);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * DELETE /api/products/:id
+ * DML 27: Uses withTransaction
+ */
+async function deleteProduct(req, res) {
+  const { id } = req.params;
+
+  try {
+    await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1 FOR UPDATE', [id]);
+      if (!check.rows.length) throw new Error('Product not found.');
+      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+
+      await client.query('DELETE FROM products WHERE product_id = $1', [id]);
+    });
+
+    return res.json({ message: 'Product deleted successfully.' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/products/:id/images
+ * DML 28: Uses withTransaction
+ */
+async function addProductImage(req, res) {
+  const { id } = req.params;
+  const { url, is_cover = false } = req.body;
+
+  if (!url) return res.status(400).json({ error: 'Image URL is required.' });
+
+  try {
+    const image = await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [id]);
+      if (!check.rows.length) throw new Error('Product not found.');
+      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+
+      if (is_cover) {
+        await client.query('UPDATE product_images SET is_cover = FALSE WHERE product_id = $1', [id]);
+      }
+
+      const { rows } = await client.query(
+        `INSERT INTO product_images (product_id, url, is_cover) VALUES ($1, $2, $3) RETURNING *`,
+        [id, url, is_cover]
+      );
+      return rows[0];
+    });
+
+    return res.status(201).json(image);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * DELETE /api/products/:productId/images/:imageId
+ * DML 29: Uses withTransaction
+ */
+async function deleteProductImage(req, res) {
+  const { productId, imageId } = req.params;
+
+  try {
+    await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [productId]);
+      if (!check.rows.length) throw new Error('Product not found.');
+      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+
+      const del = await client.query(
+        'DELETE FROM product_images WHERE image_id = $1 AND product_id = $2 RETURNING is_cover',
+        [imageId, productId]
+      );
+      if (!del.rows.length) throw new Error('Image not found.');
+
+      if (del.rows[0].is_cover) {
+        await client.query(
+          `UPDATE product_images SET is_cover = TRUE
+           WHERE image_id = (SELECT image_id FROM product_images WHERE product_id = $1 LIMIT 1)`,
+          [productId]
+        );
+      }
+    });
+
+    return res.json({ message: 'Product image deleted.' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/products/:productId/images/:imageId/cover
+ * DML 30: Uses withTransaction
+ */
+async function setProductCoverImage(req, res) {
+  const { productId, imageId } = req.params;
+
+  try {
+    await db.withTransaction(async (client) => {
+      const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [productId]);
+      if (!check.rows.length) throw new Error('Product not found.');
+      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+
+      await client.query('UPDATE product_images SET is_cover = FALSE WHERE product_id = $1', [productId]);
+      const resCover = await client.query(
+        'UPDATE product_images SET is_cover = TRUE WHERE image_id = $1 AND product_id = $2',
+        [imageId, productId]
+      );
+      if (resCover.rowCount === 0) throw new Error('Image not found.');
+    });
+
+    return res.json({ message: 'Cover image updated successfully.' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
 
 module.exports = {
   listProducts,
@@ -147,5 +307,5 @@ module.exports = {
   deleteProduct,
   addProductImage,
   deleteProductImage,
-  assertOwnsProduct,
+  setProductCoverImage,
 };

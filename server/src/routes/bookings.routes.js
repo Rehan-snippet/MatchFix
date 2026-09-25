@@ -6,7 +6,7 @@ const {
   listBookingsForMyTurfs,
   cancelBooking,
   confirmBooking,
-  rateBooking,
+  addTurfReview,
 } = require('../controllers/bookings.controller');
 
 router.use(requireAuth);
@@ -16,6 +16,6 @@ router.get('/mine', requireRole('customer'), listMyBookings);
 router.get('/for-my-turfs', requireRole('organizer'), listBookingsForMyTurfs);
 router.patch('/:id/cancel', requireRole('customer'), cancelBooking);
 router.patch('/:id/confirm', requireRole('organizer'), confirmBooking);
-router.post('/:id/review', requireRole('customer'), rateBooking);
+router.post('/:id/review', requireRole('customer'), addTurfReview);
 
 module.exports = router;

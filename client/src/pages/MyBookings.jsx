@@ -160,7 +160,7 @@ export default function MyBookings() {
               <div className="space-y-3 flex-1">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-neutral-500">
-                    #{b.booking_id.slice(0, 8)}
+                    #{String(b.booking_id).padStart(6, '0')}
                   </span>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${

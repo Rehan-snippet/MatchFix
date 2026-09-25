@@ -1,58 +1,86 @@
 const db = require('../config/db');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
 
-// POST /api/payments  (customer)
-// body: { booking_id?, order_id?, amount, purpose, method, trx_id }
-// Exactly one of booking_id / order_id must be provided — mirrors the
-// either/or design note ("A Payment settles a booking or an order, never
-// both") which the schema's CHECK constraint also enforces at the DB level.
-const createPayment = asyncHandler(async (req, res) => {
-  const { booking_id, order_id, amount, purpose, method, trx_id } = req.body;
+/**
+ * POST /api/payments
+ * DML 24: Uses withTransaction to execute sp_record_payment.
+ */
+async function createPayment(req, res) {
+  const { booking_id, order_id, amount, method, purpose } = req.body;
 
-  if ((booking_id && order_id) || (!booking_id && !order_id)) {
-    throw new ApiError(400, 'Provide exactly one of booking_id or order_id');
+  if (!booking_id && !order_id) {
+    return res.status(400).json({ error: 'Must provide either booking_id OR order_id.' });
   }
-  if (amount === undefined || !purpose || !method) {
-    throw new ApiError(400, 'amount, purpose and method are required');
+  if (booking_id && order_id) {
+    return res.status(400).json({ error: 'Payment cannot settle both booking and order at the same time.' });
   }
-
-  if (booking_id) {
-    const { rows } = await db.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
-    if (!rows[0]) throw new ApiError(404, 'Booking not found');
-    if (rows[0].customer_id !== req.user.user_id) throw new ApiError(403, 'Not your booking');
-  } else {
-    const { rows } = await db.query('SELECT * FROM orders WHERE order_id = $1', [order_id]);
-    if (!rows[0]) throw new ApiError(404, 'Order not found');
-    if (rows[0].customer_id !== req.user.user_id) throw new ApiError(403, 'Not your order');
+  if (!amount || Number(amount) <= 0) {
+    return res.status(400).json({ error: 'Payment amount must be greater than zero.' });
   }
 
-  const { rows } = await db.query(
-    `INSERT INTO payments (booking_id, order_id, amount, purpose, method, trx_id, paid_at, status)
-     VALUES ($1,$2,$3,$4,$5,$6, now(), 'success') RETURNING *`,
-    [booking_id || null, order_id || null, amount, purpose, method, trx_id || null]
-  );
+  try {
+    const payment = await db.withTransaction(async (client) => {
+      const result = await client.query(
+        'CALL sp_record_payment($1, $2, $3, $4, $5, $6, NULL)',
+        [
+          req.user.user_id,
+          booking_id ? Number(booking_id) : null,
+          order_id ? Number(order_id) : null,
+          Number(amount),
+          method || 'card',
+          purpose || 'full',
+        ]
+      );
 
-  // Booking bookings move to 'confirmed' once at least one payment lands.
-  if (booking_id) {
-    await db.query(`UPDATE bookings SET status = 'confirmed' WHERE booking_id = $1 AND status = 'pending'`, [
-      booking_id,
-    ]);
+      return {
+        payment_id: result.rows[0]?.p_payment_id,
+        status: 'completed',
+      };
+    });
+
+    return res.status(201).json({
+      ...payment,
+      message: 'Payment verified and settled successfully.',
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
+}
 
-  res.status(201).json(rows[0]);
-});
-
-// GET /api/payments?booking_id=  or  ?order_id=
-const listPayments = asyncHandler(async (req, res) => {
+/**
+ * GET /api/payments
+ */
+async function listPayments(req, res) {
   const { booking_id, order_id } = req.query;
-  if (!booking_id && !order_id) throw new ApiError(400, 'Provide booking_id or order_id');
 
-  const { rows } = await db.query(
-    `SELECT * FROM payments WHERE booking_id = $1 OR order_id = $2 ORDER BY paid_at DESC NULLS LAST`,
-    [booking_id || null, order_id || null]
-  );
-  res.json(rows);
-});
+  try {
+    let queryText = `
+      SELECT p.*
+      FROM payments p
+      LEFT JOIN bookings b ON p.booking_id = b.booking_id
+      LEFT JOIN orders o ON p.order_id = o.order_id
+      WHERE (b.customer_id = $1 OR o.customer_id = $1)
+    `;
+    const params = [req.user.user_id];
 
-module.exports = { createPayment, listPayments };
+    if (booking_id) {
+      params.push(booking_id);
+      queryText += ` AND p.booking_id = $${params.length}`;
+    }
+    if (order_id) {
+      params.push(order_id);
+      queryText += ` AND p.order_id = $${params.length}`;
+    }
+
+    queryText += ` ORDER BY p.created_at DESC`;
+
+    const { rows } = await db.query(queryText, params);
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = {
+  createPayment,
+  listPayments,
+};
