@@ -1,10 +1,11 @@
 const db = require('../config/db');
+const { parsePagination, paginatedResponse } = require('../utils/paginate');
 
 /**
  * GET /api/products
  */
 async function listProducts(req, res) {
-  const { category, condition, min_price, max_price, search } = req.query;
+  const { category, condition, min_price, max_price, search, all } = req.query;
 
   try {
     let queryText = `
@@ -58,8 +59,23 @@ async function listProducts(req, res) {
 
     queryText += ` ORDER BY p.created_at DESC`;
 
-    const { rows } = await db.query(queryText, params);
-    return res.json(rows);
+    if (all === 'true') {
+      const { rows } = await db.query(queryText, params);
+      return res.json({ data: rows, pagination: { total: rows.length, page: 1, page_size: rows.length, total_pages: 1 } });
+    }
+
+    const countRes = await db.query(
+      `SELECT COUNT(*)::INT AS total FROM (${queryText}) AS count_sub`,
+      params
+    );
+    const total = countRes.rows[0]?.total || 0;
+
+    const { page, pageSize, offset } = parsePagination(req.query, 12);
+    const pagedQuery = `${queryText} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    const pagedParams = [...params, pageSize, offset];
+
+    const { rows } = await db.query(pagedQuery, pagedParams);
+    return res.json(paginatedResponse(rows, total, page, pageSize));
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -115,17 +131,8 @@ async function getProduct(req, res) {
 async function createProduct(req, res) {
   const { title, price, category, condition = 'new', stock = 0, description, cover_url } = req.body;
 
-  if (!title || !title.trim()) {
-    return res.status(400).json({ error: 'Product title is required.' });
-  }
-  if (price === undefined || Number(price) <= 0) {
-    return res.status(400).json({ error: 'Product price must be greater than zero.' });
-  }
-  if (stock === undefined || Number(stock) < 0) {
-    return res.status(400).json({ error: 'Stock cannot be negative.' });
-  }
-  if (!category || !category.trim()) {
-    return res.status(400).json({ error: 'Product category is required.' });
+  if (!title || price === undefined || !category) {
+    return res.status(400).json({ error: 'Title, price, and category are required.' });
   }
 
   try {

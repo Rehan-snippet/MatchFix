@@ -1,17 +1,15 @@
 const jwt = require('jsonwebtoken');
 
-function getSecret() {
-  return process.env.JWT_SECRET || 'matchfix-super-secret-key-change-in-production';
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'matchfix-default-jwt-secret-key-32chars!';
 
 function sign(payload) {
-  return jwt.sign(payload, getSecret(), {
+  return jwt.sign(payload, JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 }
 
 function verify(token) {
-  return jwt.verify(token, getSecret());
+  return jwt.verify(token, JWT_SECRET);
 }
 
-module.exports = { sign, verify, getSecret };
+module.exports = { sign, verify };

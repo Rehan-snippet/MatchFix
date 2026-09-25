@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
+import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import {
   Calendar,
   Clock,
@@ -20,6 +21,7 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState('all');
+  const [paymentBooking, setPaymentBooking] = useState(null);
 
   // Review modal state
   const [reviewModal, setReviewModal] = useState({ open: false, bookingId: null, rating: 5, comment: '' });
@@ -47,19 +49,8 @@ export default function MyBookings() {
     }
   }
 
-  async function handlePay(booking) {
-    setBusyId(booking.booking_id);
-    try {
-      await api.post('/payments', {
-        booking_id: booking.booking_id,
-        amount: booking.total_amount,
-        purpose: 'full',
-        method: 'card',
-      });
-      load();
-    } finally {
-      setBusyId(null);
-    }
+  function handlePay(booking) {
+    setPaymentBooking(booking);
   }
 
   async function submitReview(e) {
@@ -339,6 +330,22 @@ export default function MyBookings() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Sandbox Payment Modal */}
+      {paymentBooking && (
+        <SandboxPaymentModal
+          bookingId={paymentBooking.booking_id}
+          amount={Number(paymentBooking.total_amount)}
+          title={`Booking #${String(paymentBooking.booking_id).padStart(6, '0')} · ${
+            paymentBooking.slots?.[0]?.turf_name || 'Match Booking'
+          }`}
+          onSuccess={() => {
+            setPaymentBooking(null);
+            load();
+          }}
+          onClose={() => setPaymentBooking(null)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { sign } = require('../utils/jwt');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'matchfix-super-secret-key-change-in-production';
+const JWT_EXPIRES_IN = '7d';
 
 /**
  * Resolve user roles across subclasses
@@ -84,7 +87,9 @@ async function register(req, res) {
     });
 
     const roles = await getUserRoles(user.user_id);
-    const token = sign({ user_id: user.user_id, email: user.email, roles });
+    const token = jwt.sign({ user_id: user.user_id, email: user.email, roles }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
 
     return res.status(201).json({
       user: { ...user, roles },
@@ -130,7 +135,9 @@ async function login(req, res) {
     }
 
     const roles = await getUserRoles(user.user_id);
-    const token = sign({ user_id: user.user_id, email: user.email, roles });
+    const token = jwt.sign({ user_id: user.user_id, email: user.email, roles }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
 
     delete user.password_hash;
 
@@ -249,25 +256,10 @@ async function changePassword(req, res) {
   }
 }
 
-/**
- * POST /api/auth/refresh
- * Re-issues a fresh token with up-to-date roles without requiring password re-entry
- */
-async function refreshToken(req, res) {
-  try {
-    const roles = await getUserRoles(req.user.user_id);
-    const token = sign({ user_id: req.user.user_id, email: req.user.email, roles });
-    return res.json({ token, roles });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-}
-
 module.exports = {
   register,
   login,
   getMe,
   updateProfile,
   changePassword,
-  refreshToken,
 };
