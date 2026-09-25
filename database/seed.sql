@@ -45,13 +45,13 @@ INSERT INTO fields (turf_id, name, side_type, surface) VALUES
   (1, 'Field B', '7v7',  'Artificial Turf'),
   (2, 'Pitch 1', '11v11','Natural Grass');
 
-INSERT INTO pricing_rules (field_id, day_of_week, start_time, end_time, hourly_rate, effective_from) VALUES
-  (1, 6, '16:00', '22:00', 1200.00, CURRENT_DATE), -- Saturday evening
-  (1, 0, '16:00', '22:00', 1200.00, CURRENT_DATE), -- Sunday evening
-  (2, 5, '06:00', '10:00',  800.00, CURRENT_DATE), -- Friday morning
-  (3, 6, '16:00', '22:00', 2500.00, CURRENT_DATE);
+INSERT INTO pricing_rules (field_id, day_of_week, start_time, end_time, hourly_rate) VALUES
+  (1, 6, '16:00', '22:00', 1200.00), -- Saturday evening
+  (1, 0, '16:00', '22:00', 1200.00), -- Sunday evening
+  (2, 5, '06:00', '10:00',  800.00), -- Friday morning
+  (3, 6, '16:00', '22:00', 2500.00);
 
-INSERT INTO price_history (rule_id, organizer_id, old_rate, new_rate) VALUES
+INSERT INTO price_history (rule_id, field_id, old_rate, new_rate) VALUES
   (1, 1, 1000.00, 1200.00);
 
 INSERT INTO slots (field_id, slot_date, start_time, end_time) VALUES

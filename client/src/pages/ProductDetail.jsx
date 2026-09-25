@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import {
   Star,
   Store,
@@ -26,6 +27,7 @@ export default function ProductDetail() {
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState(null);
 
   function load() {
     api.get(`/products/${id}`).then((res) => {
@@ -58,21 +60,15 @@ export default function ProductDetail() {
 
     setBusy(true);
     try {
-      const { data: order } = await api.post('/orders', {
+      const { data: res } = await api.post('/orders', {
         items: [{ product_id: product.product_id, qty }],
         delivery_address: address,
         delivery_phone: phone,
       });
-      await api.post('/payments', {
-        order_id: order.order_id,
-        amount: order.total,
-        purpose: 'full',
-        method: 'card',
-      });
-      setMessage('🎉 Order placed successfully! You can track it in My Orders.');
-      load();
+      const createdOrder = res.order || res;
+      setPaymentOrder(createdOrder);
     } catch (err) {
-      setErrorMsg(err.response?.data?.error || 'Order failed. Please try again.');
+      setErrorMsg(err.response?.data?.error || 'Order placement failed. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -369,6 +365,23 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+      {/* Sandbox Payment Modal */}
+      {paymentOrder && (
+        <SandboxPaymentModal
+          orderId={paymentOrder.order_id}
+          amount={Number(paymentOrder.total_amount || totalPrice)}
+          title={`Order #${String(paymentOrder.order_id).padStart(6, '0')} · ${product.title}`}
+          onSuccess={() => {
+            setPaymentOrder(null);
+            setMessage('🎉 Order placed and settled successfully! You can track it in My Orders.');
+            load();
+          }}
+          onClose={() => {
+            setPaymentOrder(null);
+            setMessage('Order created! You can settle payment anytime from My Orders.');
+          }}
+        />
+      )}
     </div>
   );
 }

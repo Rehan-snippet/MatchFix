@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
+import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import {
   Package,
   MapPin,
@@ -10,12 +11,14 @@ import {
   ArrowRight,
   CheckCircle2,
   Truck,
+  CreditCard,
   X,
 } from 'lucide-react';
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [paymentOrder, setPaymentOrder] = useState(null);
 
   // Review modal state
   const [reviewModal, setReviewModal] = useState({
@@ -125,11 +128,28 @@ export default function MyOrders() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-500 font-medium">Order Total:</span>
-                  <span className="text-base font-black text-neutral-900">
-                    ৳{Number(o.total).toLocaleString()}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-[10px] text-neutral-400 font-semibold block uppercase">Total</span>
+                    <span className="text-base font-black text-neutral-900">
+                      ৳{Number(o.total_amount || o.total || 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {o.payments?.length ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-50 text-[#16a34a] border border-green-200">
+                      Paid
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentOrder(o)}
+                      className="px-4 py-2 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Pay Now</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -278,6 +298,20 @@ export default function MyOrders() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Sandbox Payment Modal */}
+      {paymentOrder && (
+        <SandboxPaymentModal
+          orderId={paymentOrder.order_id}
+          amount={Number(paymentOrder.total_amount || paymentOrder.total || 0)}
+          title={`Order #${String(paymentOrder.order_id).padStart(6, '0')} Checkout`}
+          onSuccess={() => {
+            setPaymentOrder(null);
+            load();
+          }}
+          onClose={() => setPaymentOrder(null)}
+        />
       )}
     </div>
   );
