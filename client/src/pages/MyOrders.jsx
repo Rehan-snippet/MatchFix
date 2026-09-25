@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import SandboxPaymentModal from '../components/SandboxPaymentModal';
+import Pagination from '../components/Pagination';
 import {
   Package,
   MapPin,
@@ -19,6 +20,8 @@ export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentOrder, setPaymentOrder] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
 
   // Review modal state
   const [reviewModal, setReviewModal] = useState({
@@ -32,15 +35,25 @@ export default function MyOrders() {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
 
-  function load() {
+  function load(pageNum = page) {
     setLoading(true);
     api
-      .get('/orders/mine')
-      .then((res) => setOrders(res.data || []))
+      .get('/orders/mine', { params: { page: pageNum } })
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setOrders(res.data);
+          setPagination(null);
+        } else {
+          setOrders(res.data.data || []);
+          setPagination(res.data.pagination || null);
+        }
+      })
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, []);
+  useEffect(() => {
+    load(page);
+  }, [page]);
 
   async function submitReview(e) {
     e.preventDefault();
@@ -212,6 +225,15 @@ export default function MyOrders() {
           ))}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <Pagination
+        pagination={pagination}
+        onPageChange={(p) => {
+          setPage(p);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       {/* Review Modal */}
       {reviewModal.open && (

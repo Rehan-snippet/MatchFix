@@ -5,6 +5,7 @@ import TurfCard from '../components/TurfCard';
 import TurfMap from '../components/TurfMap';
 import CategoryBar from '../components/CategoryBar';
 import FilterModal from '../components/FilterModal';
+import Pagination from '../components/Pagination';
 import { MapPin, Tag, SlidersHorizontal, Map, List, Frown } from 'lucide-react';
 
 export default function Turfs() {
@@ -13,6 +14,8 @@ export default function Turfs() {
   const [turfs, setTurfs] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
 
   // Search query params
   const areaId = searchParams.get('area_id') || '';
@@ -74,16 +77,24 @@ export default function Turfs() {
   // Fetch turfs from API
   useEffect(() => {
     setLoading(true);
-    const params = {};
+    const params = { page };
     if (areaId) params.area_id = areaId;
     if (keyword) params.keyword = keyword;
 
     api
       .get('/turfs', { params })
-      .then((res) => setTurfs(res.data))
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setTurfs(res.data);
+          setPagination(null);
+        } else {
+          setTurfs(res.data.data || []);
+          setPagination(res.data.pagination || null);
+        }
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
-  }, [areaId, keyword]);
+  }, [areaId, keyword, page]);
 
   // Handle category click from CategoryBar
   function handleSelectCategory(cat) {
@@ -291,6 +302,15 @@ export default function Turfs() {
                 ))}
               </div>
             )}
+
+            {/* Pagination Controls */}
+            <Pagination
+              pagination={pagination}
+              onPageChange={(p) => {
+                setPage(p);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           </div>
 
           {/* RIGHT SIDE: Sticky Interactive Map (5 cols on desktop) */}

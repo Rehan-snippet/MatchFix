@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import SandboxPaymentModal from '../components/SandboxPaymentModal';
+import Pagination from '../components/Pagination';
 import {
   Calendar,
   Clock,
@@ -22,21 +23,33 @@ export default function MyBookings() {
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState('all');
   const [paymentBooking, setPaymentBooking] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
 
   // Review modal state
   const [reviewModal, setReviewModal] = useState({ open: false, bookingId: null, rating: 5, comment: '' });
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
 
-  function load() {
+  function load(pageNum = page) {
     setLoading(true);
     api
-      .get('/bookings/mine')
-      .then((res) => setBookings(res.data || []))
+      .get('/bookings/mine', { params: { page: pageNum } })
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          setBookings(res.data);
+          setPagination(null);
+        } else {
+          setBookings(res.data.data || []);
+          setPagination(res.data.pagination || null);
+        }
+      })
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, []);
+  useEffect(() => {
+    load(page);
+  }, [page]);
 
   async function handleCancel(id) {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
@@ -244,6 +257,15 @@ export default function MyBookings() {
           ))}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <Pagination
+        pagination={pagination}
+        onPageChange={(p) => {
+          setPage(p);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       {/* Review Modal (Airbnb Modal Style) */}
       {reviewModal.open && (
