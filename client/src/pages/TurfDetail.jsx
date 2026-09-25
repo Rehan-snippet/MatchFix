@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import L from 'leaflet';
 import {
   Star,
@@ -37,7 +36,6 @@ export default function TurfDetail() {
   const [busy, setBusy] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
-  const [paymentBooking, setPaymentBooking] = useState(null);
 
   const miniMapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -138,7 +136,7 @@ export default function TurfDetail() {
 
     setBusy(true);
     try {
-      const { data: bookingRes } = await api.post('/bookings', {
+      await api.post('/bookings', {
         slots: selected.map((s) => ({
           field_id: fieldId,
           slot_date: date,
@@ -147,13 +145,10 @@ export default function TurfDetail() {
         })),
       });
       setIsSuccess(true);
-      setMessage('Match booking created! Opening sandbox checkout...');
+      setMessage('Match booking created! Proceed to "My Bookings" to complete payment and view entry code.');
       setSelected([]);
       const res = await api.get('/slots', { params: { field_id: fieldId, date } });
       setSlots(res.data);
-      if (bookingRes?.booking_id) {
-        setPaymentBooking(bookingRes);
-      }
     } catch (err) {
       setIsSuccess(false);
       setMessage(err.response?.data?.error || 'Booking failed. Please try another slot.');
@@ -553,22 +548,6 @@ export default function TurfDetail() {
           </div>
         </div>
       </div>
-      {/* Sandbox Payment Modal */}
-      {paymentBooking && (
-        <SandboxPaymentModal
-          bookingId={paymentBooking.booking_id}
-          amount={Number(paymentBooking.total_amount)}
-          title={`Booking #${String(paymentBooking.booking_id).padStart(6, '0')} · ${turf.name}`}
-          onSuccess={() => {
-            setPaymentBooking(null);
-            setMessage('🎉 Booking confirmed and paid successfully! View details in My Bookings.');
-          }}
-          onClose={() => {
-            setPaymentBooking(null);
-            setMessage('Booking created! You can complete payment anytime from My Bookings.');
-          }}
-        />
-      )}
     </div>
   );
 }

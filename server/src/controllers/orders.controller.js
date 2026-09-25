@@ -217,8 +217,23 @@ async function updateOrderStatus(req, res) {
 
   try {
     await db.withTransaction(async (client) => {
-      const resUpdate = await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', [status, id]);
-      if (resUpdate.rowCount === 0) throw new Error('Order not found.');
+      const currentRes = await client.query('SELECT status FROM orders WHERE order_id = $1 FOR UPDATE', [id]);
+      if (!currentRes.rows.length) throw new Error('Order not found.');
+      const currentStatus = currentRes.rows[0].status;
+
+      const validTransitions = {
+        placed: ['confirmed', 'cancelled'],
+        confirmed: ['shipped', 'cancelled'],
+        shipped: ['delivered'],
+        delivered: [],
+        cancelled: [],
+      };
+
+      if (!validTransitions[currentStatus]?.includes(status)) {
+        throw new Error(`Cannot transition order from "${currentStatus}" to "${status}".`);
+      }
+
+      await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', [status, id]);
       await client.query('UPDATE order_items SET status = $1 WHERE order_id = $2', [status, id]);
     });
 

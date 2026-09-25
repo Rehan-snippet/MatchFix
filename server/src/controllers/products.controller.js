@@ -115,8 +115,17 @@ async function getProduct(req, res) {
 async function createProduct(req, res) {
   const { title, price, category, condition = 'new', stock = 0, description, cover_url } = req.body;
 
-  if (!title || price === undefined || !category) {
-    return res.status(400).json({ error: 'Title, price, and category are required.' });
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Product title is required.' });
+  }
+  if (price === undefined || Number(price) <= 0) {
+    return res.status(400).json({ error: 'Product price must be greater than zero.' });
+  }
+  if (stock === undefined || Number(stock) < 0) {
+    return res.status(400).json({ error: 'Stock cannot be negative.' });
+  }
+  if (!category || !category.trim()) {
+    return res.status(400).json({ error: 'Product category is required.' });
   }
 
   try {

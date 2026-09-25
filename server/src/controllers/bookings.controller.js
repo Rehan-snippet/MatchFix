@@ -10,6 +10,16 @@ async function createBooking(req, res) {
     return res.status(400).json({ error: 'Please provide at least one slot in slots array.' });
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  for (const slot of slots) {
+    if (!slot.field_id || !slot.slot_date || !slot.start_time || !slot.end_time) {
+      return res.status(400).json({ error: 'Each slot requires field_id, slot_date, start_time, and end_time.' });
+    }
+    if (slot.slot_date < todayStr) {
+      return res.status(400).json({ error: 'Cannot book match slots in the past.' });
+    }
+  }
+
   try {
     const booking = await db.withTransaction(async (client) => {
       const result = await client.query(
