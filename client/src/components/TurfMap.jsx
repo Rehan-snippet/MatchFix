@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import { Maximize2, RotateCcw, Plus, Minus } from 'lucide-react';
 
-// CartoDB Positron tile layer URL (the clean Airbnb light map style)
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+// Clean OpenStreetMap tile layer (100% free, zero watermark, no API key required)
+const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 export default function TurfMap({
   turfs = [],
