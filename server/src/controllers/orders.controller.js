@@ -1,5 +1,4 @@
 const db = require('../config/db');
-const { parsePagination, paginatedResponse } = require('../utils/paginate');
 /**
  * POST /api/orders
  * DML 31: Uses withTransaction to enforce ACID checkout.
@@ -94,10 +93,8 @@ async function createOrder(req, res) {
  */
 async function listMyOrders(req, res) {
   try {
-    const { all } = req.query;
-
-    const baseQuery = `
-      SELECT
+    const { rows } = await db.query(
+      `SELECT
         o.order_id,
         o.total_amount,
         o.status,
@@ -122,25 +119,11 @@ async function listMyOrders(req, res) {
       JOIN products p ON oi.product_id = p.product_id
       WHERE o.customer_id = $1
       GROUP BY o.order_id
-      ORDER BY o.created_at DESC
-    `;
-
-    if (all === 'true') {
-      const { rows } = await db.query(baseQuery, [req.user.user_id]);
-      return res.json({ data: rows, pagination: { total: rows.length, page: 1, page_size: rows.length, total_pages: 1 } });
-    }
-
-    const countRes = await db.query(
-      'SELECT COUNT(*)::INT AS total FROM orders WHERE customer_id = $1',
+      ORDER BY o.created_at DESC`,
       [req.user.user_id]
     );
-    const total = countRes.rows[0]?.total || 0;
 
-    const { page, pageSize, offset } = parsePagination(req.query, 10);
-    const pagedQuery = `${baseQuery} LIMIT $2 OFFSET $3`;
-
-    const { rows } = await db.query(pagedQuery, [req.user.user_id, pageSize, offset]);
-    return res.json(paginatedResponse(rows, total, page, pageSize));
+    return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

@@ -1,11 +1,10 @@
 const db = require('../config/db');
-const { parsePagination, paginatedResponse } = require('../utils/paginate');
 
 /**
  * GET /api/products
  */
 async function listProducts(req, res) {
-  const { category, condition, min_price, max_price, search, all } = req.query;
+  const { category, condition, min_price, max_price, search } = req.query;
 
   try {
     let queryText = `
@@ -59,23 +58,8 @@ async function listProducts(req, res) {
 
     queryText += ` ORDER BY p.created_at DESC`;
 
-    if (all === 'true') {
-      const { rows } = await db.query(queryText, params);
-      return res.json({ data: rows, pagination: { total: rows.length, page: 1, page_size: rows.length, total_pages: 1 } });
-    }
-
-    const countRes = await db.query(
-      `SELECT COUNT(*)::INT AS total FROM (${queryText}) AS count_sub`,
-      params
-    );
-    const total = countRes.rows[0]?.total || 0;
-
-    const { page, pageSize, offset } = parsePagination(req.query, 12);
-    const pagedQuery = `${queryText} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    const pagedParams = [...params, pageSize, offset];
-
-    const { rows } = await db.query(pagedQuery, pagedParams);
-    return res.json(paginatedResponse(rows, total, page, pageSize));
+    const { rows } = await db.query(queryText, params);
+    return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

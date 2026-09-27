@@ -25,7 +25,7 @@ export default function Marketplace() {
       api
         .get('/products', { params: q ? { q } : {} })
         .then((res) => {
-          let list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+          let list = res.data || [];
           if (category !== 'All Items') {
             list = list.filter((p) =>
               p.category?.toLowerCase().includes(category.toLowerCase()) ||

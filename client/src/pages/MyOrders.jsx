@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import SandboxPaymentModal from '../components/SandboxPaymentModal';
-import Pagination from '../components/Pagination';
-import ReviewModal from '../components/ReviewModal';
-import { useToast } from '../context/ToastContext';
 import {
   Package,
   MapPin,
@@ -19,12 +16,9 @@ import {
 } from 'lucide-react';
 
 export default function MyOrders() {
-  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentOrder, setPaymentOrder] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState(null);
 
   // Review modal state
   const [reviewModal, setReviewModal] = useState({
@@ -32,38 +26,48 @@ export default function MyOrders() {
     orderId: null,
     productId: null,
     itemTitle: '',
+    rating: 5,
+    comment: '',
   });
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
-  function load(pageNum = page) {
+  function load() {
     setLoading(true);
     api
-      .get('/orders/mine', { params: { page: pageNum } })
-      .then((res) => {
-        if (Array.isArray(res.data)) {
-          setOrders(res.data);
-          setPagination(null);
-        } else {
-          setOrders(res.data.data || []);
-          setPagination(res.data.pagination || null);
-        }
-      })
+      .get('/orders/mine')
+      .then((res) => setOrders(res.data || []))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => {
-    load(page);
-  }, [page]);
+  useEffect(load, []);
 
-  async function handleReviewSubmit({ rating, comment }) {
-    await api.post(
-      `/orders/${reviewModal.orderId}/items/${reviewModal.productId}/review`,
-      {
-        rating,
-        comment,
-      }
-    );
-    toast.success('Thank you! Your product review has been submitted.');
-    load();
+  async function submitReview(e) {
+    e.preventDefault();
+    setReviewBusy(true);
+    setReviewError('');
+    try {
+      await api.post(
+        `/orders/${reviewModal.orderId}/items/${reviewModal.productId}/review`,
+        {
+          rating: reviewModal.rating,
+          comment: reviewModal.comment,
+        }
+      );
+      setReviewModal({
+        open: false,
+        orderId: null,
+        productId: null,
+        itemTitle: '',
+        rating: 5,
+        comment: '',
+      });
+      load();
+    } catch (err) {
+      setReviewError(err.response?.data?.error || 'Could not submit product review.');
+    } finally {
+      setReviewBusy(false);
+    }
   }
 
   return (
@@ -209,31 +213,92 @@ export default function MyOrders() {
         </div>
       )}
 
-      {/* Pagination Controls */}
-      <Pagination
-        pagination={pagination}
-        onPageChange={(p) => {
-          setPage(p);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      {/* Review Modal */}
+      {reviewModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-neutral-900">Review Gear</h3>
+              <button
+                type="button"
+                onClick={() => setReviewModal({ ...reviewModal, open: false })}
+                className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-      {/* Shared Review Modal */}
-      <ReviewModal
-        isOpen={reviewModal.open}
-        title={reviewModal.itemTitle ? `Review: ${reviewModal.itemTitle}` : 'Review Gear'}
-        subtitle="Share your honest feedback on product quality, fit, and performance."
-        commentPlaceholder="How was the product quality and fit? (Optional)"
-        onSubmit={handleReviewSubmit}
-        onClose={() =>
-          setReviewModal({
-            open: false,
-            orderId: null,
-            productId: null,
-            itemTitle: '',
-          })
-        }
-      />
+            <p className="text-xs text-neutral-500">
+              Reviewing: <strong className="text-neutral-900">{reviewModal.itemTitle}</strong>
+            </p>
+
+            {reviewError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {reviewError}
+              </div>
+            )}
+
+            <form onSubmit={submitReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-2">Rating</label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setReviewModal({ ...reviewModal, rating: star })}
+                      className="p-1 cursor-pointer transition hover:scale-110"
+                    >
+                      <Star
+                        className={`w-7 h-7 ${
+                          star <= reviewModal.rating
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-neutral-200'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 text-sm font-bold text-neutral-800">
+                    {reviewModal.rating} of 5
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">
+                  Comments & Feedback
+                </label>
+                <textarea
+                  rows={3}
+                  value={reviewModal.comment}
+                  onChange={(e) =>
+                    setReviewModal({ ...reviewModal, comment: e.target.value })
+                  }
+                  placeholder="How was the product quality and fit?"
+                  className="w-full p-3 rounded-2xl border border-neutral-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewModal({ ...reviewModal, open: false })}
+                  className="px-4 py-2.5 rounded-2xl text-xs font-bold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewBusy}
+                  className="px-5 py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                >
+                  {reviewBusy ? 'Submitting…' : 'Submit Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Sandbox Payment Modal */}
       {paymentOrder && (

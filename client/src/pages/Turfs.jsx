@@ -5,7 +5,6 @@ import TurfCard from '../components/TurfCard';
 import TurfMap from '../components/TurfMap';
 import CategoryBar from '../components/CategoryBar';
 import FilterModal from '../components/FilterModal';
-import Pagination from '../components/Pagination';
 import { MapPin, Tag, SlidersHorizontal, Map, List, Frown } from 'lucide-react';
 
 export default function Turfs() {
@@ -14,9 +13,6 @@ export default function Turfs() {
   const [turfs, setTurfs] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState('');
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState(null);
 
   // Search query params
   const areaId = searchParams.get('area_id') || '';
@@ -72,37 +68,22 @@ export default function Turfs() {
 
   // Fetch areas
   useEffect(() => {
-    api
-      .get('/areas')
-      .then((res) => setAreas(Array.isArray(res.data) ? res.data : []))
-      .catch((err) => console.error('Failed to load areas in Turfs:', err));
+    api.get('/areas').then((res) => setAreas(res.data)).catch(() => {});
   }, []);
 
   // Fetch turfs from API
   useEffect(() => {
     setLoading(true);
-    setFetchError('');
-    const params = { page };
+    const params = {};
     if (areaId) params.area_id = areaId;
-    if (keyword) params.search = keyword;
+    if (keyword) params.keyword = keyword;
 
     api
       .get('/turfs', { params })
-      .then((res) => {
-        if (Array.isArray(res.data)) {
-          setTurfs(res.data);
-          setPagination(null);
-        } else {
-          setTurfs(res.data.data || []);
-          setPagination(res.data.pagination || null);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch turfs:', err);
-        setFetchError('Could not load turfs. Please check your connection and try again.');
-      })
+      .then((res) => setTurfs(res.data))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
-  }, [areaId, keyword, page]);
+  }, [areaId, keyword]);
 
   // Handle category click from CategoryBar
   function handleSelectCategory(cat) {
@@ -249,19 +230,6 @@ export default function Turfs() {
               mobileView === 'map' ? 'hidden lg:block' : 'block'
             }`}
           >
-            {fetchError && (
-              <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center justify-between">
-                <span>{fetchError}</span>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => p)}
-                  className="px-3 py-1 rounded-xl bg-rose-600 text-white font-bold hover:bg-rose-700 transition"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[1, 2, 3, 4].map((n) => (
@@ -323,15 +291,6 @@ export default function Turfs() {
                 ))}
               </div>
             )}
-
-            {/* Pagination Controls */}
-            <Pagination
-              pagination={pagination}
-              onPageChange={(p) => {
-                setPage(p);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
           </div>
 
           {/* RIGHT SIDE: Sticky Interactive Map (5 cols on desktop) */}

@@ -45,43 +45,41 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Quick Demo Credentials Bar (Dev Only) */}
-        {import.meta.env.DEV && (
-          <div className="mb-6 p-3 rounded-2xl bg-neutral-50 border border-neutral-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#16a34a]" />
-                Quick Demo Fill (Pass: Passw0rd!)
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('rafi@matchfix.dev')}
-                className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <UserCheck className="w-3 h-3 text-[#16a34a]" />
-                Player
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('turfrunners@matchfix.dev')}
-                className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Trophy className="w-3 h-3 text-[#16a34a]" />
-                Organizer
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('gearbazaar@matchfix.dev')}
-                className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Store className="w-3 h-3 text-[#16a34a]" />
-                Seller
-              </button>
-            </div>
+        {/* Quick Demo Credentials Bar */}
+        <div className="mb-6 p-3 rounded-2xl bg-neutral-50 border border-neutral-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#16a34a]" />
+              Quick Demo Fill (Pass: Passw0rd!)
+            </span>
           </div>
-        )}
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleQuickFill('rafi@matchfix.dev')}
+              className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <UserCheck className="w-3 h-3 text-[#16a34a]" />
+              Player
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill('turfrunners@matchfix.dev')}
+              className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <Trophy className="w-3 h-3 text-[#16a34a]" />
+              Organizer
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill('gearbazaar@matchfix.dev')}
+              className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <Store className="w-3 h-3 text-[#16a34a]" />
+              Seller
+            </button>
+          </div>
+        </div>
 
         {/* Error Notification */}
         {error && (

@@ -240,19 +240,17 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
-                          {import.meta.env.DEV && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setErdOpen(true);
-                                setMenuOpen(false);
-                              }}
-                              className="w-full text-left flex items-center gap-2.5 px-4 py-2 hover:bg-neutral-100 text-xs text-neutral-800 font-medium cursor-pointer"
-                            >
-                              <Database className="w-4 h-4 text-[#16a34a]" />
-                              <span>Entity Relationship Diagram (Dev)</span>
-                            </button>
-                          )}
+                          {/* <button
+                            type="button"
+                            onClick={() => {
+                              setErdOpen(true);
+                              setMenuOpen(false);
+                            }}
+                            className="w-full text-left flex items-center gap-2.5 px-4 py-2 hover:bg-neutral-100 text-xs text-neutral-800 font-medium cursor-pointer"
+                          >
+                            <Database className="w-4 h-4 text-[#16a34a]" />
+                            <span>Entity Relationship Diagram</span>
+                          </button> */}
                           <Link
                             to="/turfs"
                             onClick={() => setMenuOpen(false)}
@@ -285,8 +283,8 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* ERD Modal (Dev Only) */}
-      {import.meta.env.DEV && <ErdModal isOpen={erdOpen} onClose={() => setErdOpen(false)} />}
+      {/* ERD Modal */}
+      <ErdModal isOpen={erdOpen} onClose={() => setErdOpen(false)} />
     </>
   );
 }

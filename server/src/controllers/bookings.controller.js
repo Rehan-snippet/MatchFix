@@ -1,5 +1,4 @@
 const db = require('../config/db');
-const { parsePagination, paginatedResponse } = require('../utils/paginate');
 
 /**
  * POST /api/bookings
@@ -9,16 +8,6 @@ async function createBooking(req, res) {
   const { slots } = req.body;
   if (!Array.isArray(slots) || slots.length === 0) {
     return res.status(400).json({ error: 'Please provide at least one slot in slots array.' });
-  }
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  for (const slot of slots) {
-    if (!slot.field_id || !slot.slot_date || !slot.start_time || !slot.end_time) {
-      return res.status(400).json({ error: 'Each slot requires field_id, slot_date, start_time, and end_time.' });
-    }
-    if (slot.slot_date < todayStr) {
-      return res.status(400).json({ error: 'Cannot book match slots in the past.' });
-    }
   }
 
   try {
@@ -52,10 +41,8 @@ async function createBooking(req, res) {
  */
 async function listMyBookings(req, res) {
   try {
-    const { all } = req.query;
-
-    const baseQuery = `
-      SELECT
+    const { rows } = await db.query(
+      `SELECT
         b.booking_id,
         b.status,
         b.total_amount,
@@ -89,25 +76,11 @@ async function listMyBookings(req, res) {
       LEFT JOIN turfs t ON f.turf_id = t.turf_id
       WHERE b.customer_id = $1
       GROUP BY b.booking_id
-      ORDER BY b.created_at DESC
-    `;
-
-    if (all === 'true') {
-      const { rows } = await db.query(baseQuery, [req.user.user_id]);
-      return res.json({ data: rows, pagination: { total: rows.length, page: 1, page_size: rows.length, total_pages: 1 } });
-    }
-
-    const countRes = await db.query(
-      'SELECT COUNT(*)::INT AS total FROM bookings WHERE customer_id = $1',
+      ORDER BY b.created_at DESC`,
       [req.user.user_id]
     );
-    const total = countRes.rows[0]?.total || 0;
 
-    const { page, pageSize, offset } = parsePagination(req.query, 10);
-    const pagedQuery = `${baseQuery} LIMIT $2 OFFSET $3`;
-
-    const { rows } = await db.query(pagedQuery, [req.user.user_id, pageSize, offset]);
-    return res.json(paginatedResponse(rows, total, page, pageSize));
+    return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
