@@ -54,12 +54,17 @@ INSERT INTO pricing_rules (field_id, day_of_week, start_time, end_time, hourly_r
 INSERT INTO price_history (rule_id, field_id, old_rate, new_rate) VALUES
   (1, 1, 1000.00, 1200.00);
 
-INSERT INTO slots (field_id, slot_date, start_time, end_time) VALUES
-  (1, CURRENT_DATE + 2, '16:00', '17:00'),
-  (1, CURRENT_DATE + 2, '17:00', '18:00'),
-  (1, CURRENT_DATE + 2, '18:00', '19:00'),
-  (3, CURRENT_DATE + 3, '16:00', '17:00'),
-  (3, CURRENT_DATE + 3, '17:00', '18:00');
+-- Generate slots for all seeded fields for today and the next 14 days (08:00 to 23:00)
+INSERT INTO slots (field_id, slot_date, start_time, end_time)
+SELECT
+  f.field_id,
+  d::DATE,
+  (h || ':00:00')::TIME,
+  ((h + 1) || ':00:00')::TIME
+FROM fields f
+CROSS JOIN generate_series(CURRENT_DATE, CURRENT_DATE + INTERVAL '14 days', '1 day'::INTERVAL) d
+CROSS JOIN generate_series(8, 22) h
+ON CONFLICT (field_id, slot_date, start_time) DO NOTHING;
 
 INSERT INTO products (seller_id, title, category, description, price, condition, stock) VALUES
   (4, 'Nike Mercurial Vapor 15', 'Boots',   'Firm ground football boots, size 42.', 8500.00, 'new', 12),

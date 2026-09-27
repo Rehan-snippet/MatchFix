@@ -10,7 +10,8 @@
     "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/seed.js",
     "db:seed:dhaka": "node scripts/seedDhaka.js",
-    "db:seed:marketplace": "node scripts/seedMarketplace.js"
+    "db:seed:marketplace": "node scripts/seedMarketplace.js",
+    "db:seed:slots": "node scripts/seedSlots.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
