@@ -4,15 +4,13 @@ import api from '../api/client';
 import AirbnbSearchCapsule from '../components/SearchCapsule';
 import CategoryBar from '../components/CategoryBar';
 import TurfCard from '../components/TurfCard';
-import ErdModal from '../components/ErdModal';
-import { ArrowRight, Trophy, Sparkles, Shield, ShoppingBag, ChevronRight, CheckCircle2, Database } from 'lucide-react';
+import { ArrowRight, Trophy, Sparkles, Shield, ShoppingBag, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 export default function Home() {
   const [turfs, setTurfs] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [includeFees, setIncludeFees] = useState(true);
-  const [erdOpen, setErdOpen] = useState(false);
 
   // Favorites state
   const [favorites, setFavorites] = useState(() => {
@@ -232,9 +230,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* ERD Modal Trigger */}
-      <ErdModal isOpen={erdOpen} onClose={() => setErdOpen(false)} />
     </div>
   );
 }
