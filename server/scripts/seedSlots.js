@@ -12,7 +12,7 @@ async function seedUpcomingSlots() {
       (h || ':00:00')::TIME,
       ((h + 1) || ':00:00')::TIME
     FROM fields f
-    CROSS JOIN generate_series(CURRENT_DATE, CURRENT_DATE + INTERVAL '14 days', '1 day'::INTERVAL) d
+    CROSS JOIN generate_series(CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '14 days', '1 day'::INTERVAL) d
     CROSS JOIN generate_series(8, 22) h
     WHERE f.field_id <= 11
     ON CONFLICT (field_id, slot_date, start_time) DO NOTHING;
