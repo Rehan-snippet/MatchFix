@@ -81,7 +81,32 @@ async function getTurf(req, res) {
         (
           SELECT json_agg(json_build_object('field_id', f.field_id, 'name', f.name, 'surface', f.surface, 'side_type', f.side_type))
           FROM fields f WHERE f.turf_id = t.turf_id
-        ) AS fields
+        ) AS fields,
+        (
+          SELECT COALESCE(json_agg(json_build_object(
+            'review_id', tr.review_id,
+            'rating', tr.rating,
+            'comment', tr.comment,
+            'customer_name', cu.name,
+            'created_at', tr.created_at
+          )), '[]'::json)
+          FROM (
+            SELECT DISTINCT ON (tr_inner.review_id)
+              tr_inner.review_id,
+              tr_inner.rating,
+              tr_inner.comment,
+              tr_inner.created_at,
+              b_inner.customer_id
+            FROM turf_reviews tr_inner
+            JOIN bookings b_inner ON tr_inner.booking_id = b_inner.booking_id
+            JOIN booking_slots bs_inner ON b_inner.booking_id = bs_inner.booking_id
+            JOIN fields f_inner ON bs_inner.field_id = f_inner.field_id
+            WHERE f_inner.turf_id = t.turf_id
+              AND b_inner.status <> 'cancelled'
+            ORDER BY tr_inner.review_id, tr_inner.created_at DESC
+          ) tr
+          JOIN users cu ON tr.customer_id = cu.user_id
+        ) AS reviews
        FROM turfs t
        JOIN areas a ON t.area_id = a.area_id
        JOIN users u ON t.organizer_id = u.user_id

@@ -206,11 +206,13 @@ export default function TurfDetail() {
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm text-neutral-700">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 font-bold text-neutral-900">
-              <Star className="w-4 h-4 fill-neutral-900 stroke-neutral-900" />
-              <span>4.92</span>
+              <Star className="w-4 h-4 fill-amber-400 stroke-amber-400" />
+              <span>{turf.average_rating ? Number(turf.average_rating).toFixed(2) : '5.00'}</span>
             </span>
             <span>·</span>
-            <span className="underline font-semibold cursor-pointer">28 reviews</span>
+            <a href="#reviews" className="underline font-semibold cursor-pointer text-neutral-800 hover:text-black">
+              {turf.reviews?.length || 0} {turf.reviews?.length === 1 ? 'review' : 'reviews'}
+            </a>
             <span>·</span>
             <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs">
               Guest favorite
@@ -557,6 +559,66 @@ export default function TurfDetail() {
           </div>
         </div>
       </div>
+
+      {/* 5. Verified Match Reviews Section */}
+      <div id="reviews" className="mt-12 pt-8 border-t border-neutral-200">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-1.5 text-xl sm:text-2xl font-black text-neutral-900">
+            <Star className="w-6 h-6 fill-amber-400 stroke-amber-400" />
+            <span>{turf.average_rating ? Number(turf.average_rating).toFixed(2) : '5.00'}</span>
+          </div>
+          <span className="text-xl sm:text-2xl font-black text-neutral-300">·</span>
+          <h2 className="text-xl sm:text-2xl font-black text-neutral-900">
+            {turf.reviews?.length || 0} {turf.reviews?.length === 1 ? 'Verified Review' : 'Verified Reviews'}
+          </h2>
+        </div>
+
+        {turf.reviews && turf.reviews.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {turf.reviews.map((r) => (
+              <div
+                key={r.review_id}
+                className="p-5 rounded-2xl bg-neutral-50/80 border border-neutral-200/80 space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-[#16a34a]/10 text-[#16a34a] flex items-center justify-center font-black text-sm">
+                      {r.customer_name ? r.customer_name[0].toUpperCase() : 'U'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-neutral-900 leading-tight">
+                        {r.customer_name || 'Verified Player'}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 font-medium">
+                        {new Date(r.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-neutral-200 text-xs font-bold text-neutral-800">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                    <span>{r.rating}</span>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-normal">
+                  {r.comment || 'Great experience playing at this pitch! Excellent lighting and surface.'}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-2xl bg-neutral-50 border border-dashed border-neutral-200 text-center">
+            <p className="text-sm font-bold text-neutral-800">No verified reviews yet</p>
+            <p className="text-xs text-neutral-500 mt-1">
+              Be the first player to book a match at this venue and leave a review!
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Sandbox Payment Modal */}
       {paymentBooking && (
         <SandboxPaymentModal
