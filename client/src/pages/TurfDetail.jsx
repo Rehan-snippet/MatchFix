@@ -390,8 +390,8 @@ export default function TurfDetail() {
             <p className="text-xs text-neutral-500">
               {turf.address} · {turf.area_name}, Dhaka
             </p>
-            <div className="w-full h-72 rounded-2xl overflow-hidden border border-neutral-200 shadow-sm">
-              <div ref={miniMapRef} className="w-full h-full" />
+            <div className="w-full h-72 rounded-2xl overflow-hidden border border-neutral-200 shadow-sm relative z-0 isolate">
+              <div ref={miniMapRef} className="w-full h-full z-0" />
             </div>
           </div>
         </div>

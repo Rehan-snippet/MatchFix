@@ -182,7 +182,7 @@ export default function TurfMap({
   }
 
   return (
-    <div className="relative w-full h-full min-h-[420px] rounded-3xl overflow-hidden shadow-inner border border-neutral-200">
+    <div className="relative z-0 isolate w-full h-full min-h-[420px] rounded-3xl overflow-hidden shadow-inner border border-neutral-200">
       {/* Map Container */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 

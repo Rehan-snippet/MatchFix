@@ -67,7 +67,7 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-2xl mx-auto">
+    <div ref={containerRef} className="relative z-50 w-full max-w-2xl mx-auto">
       {/* Search Capsule Bar */}
       <div
         className={`flex items-center bg-white rounded-full border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
@@ -150,7 +150,7 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
 
       {/* Expanded Interactive Dropdown Popup */}
       {activeTab && (
-        <div className="absolute top-full left-0 right-0 mt-3 p-5 bg-white rounded-3xl shadow-2xl border border-neutral-200 z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute top-full left-0 right-0 mt-3 p-5 bg-white rounded-3xl shadow-2xl border border-neutral-200 z-[100] animate-in fade-in zoom-in-95 duration-150">
           <div className="flex justify-between items-center pb-3 mb-4 border-b border-neutral-100">
             <h4 className="font-semibold text-neutral-900 text-sm">
               {activeTab === "where" &&

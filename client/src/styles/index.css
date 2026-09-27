@@ -415,6 +415,10 @@ select {
 }
 
 /* Airbnb Map & Price Markers */
+.leaflet-container {
+  z-index: 0 !important;
+}
+
 .leaflet-div-icon {
   background: transparent !important;
   border: none !important;
@@ -445,7 +449,7 @@ select {
   border-color: #15803d !important;
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
-  z-index: 1000 !important;
+  z-index: 20 !important;
 }
 
 .airbnb-popup .leaflet-popup-content-wrapper {
