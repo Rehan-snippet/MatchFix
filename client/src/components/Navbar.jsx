@@ -11,14 +11,17 @@ import {
   LogOut,
   Calendar,
   Package,
+  Database,
 } from "lucide-react";
 import AirbnbSearchCapsule from "./SearchCapsule";
+import ErdModal from "./ErdModal";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [erdOpen, setErdOpen] = useState(false);
   const menuRef = useRef(null);
 
   const isTurfsPage = location.pathname === "/turfs";
@@ -164,6 +167,17 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
+                          {/* <button
+                            type="button"
+                            onClick={() => {
+                              setErdOpen(true);
+                              setMenuOpen(false);
+                            }}
+                            className="w-full text-left flex items-center gap-2.5 px-4 py-2 hover:bg-neutral-100 text-xs text-neutral-800 font-medium cursor-pointer"
+                          >
+                            <Database className="w-4 h-4 text-[#16a34a]" />
+                            <span>Entity Relationship Diagram</span>
+                          </button> */}
                           {user.roles?.includes("organizer") && (
                             <Link
                               to="/organizer"
@@ -226,6 +240,17 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
+                          {/* <button
+                            type="button"
+                            onClick={() => {
+                              setErdOpen(true);
+                              setMenuOpen(false);
+                            }}
+                            className="w-full text-left flex items-center gap-2.5 px-4 py-2 hover:bg-neutral-100 text-xs text-neutral-800 font-medium cursor-pointer"
+                          >
+                            <Database className="w-4 h-4 text-[#16a34a]" />
+                            <span>Entity Relationship Diagram</span>
+                          </button> */}
                           <Link
                             to="/turfs"
                             onClick={() => setMenuOpen(false)}
@@ -257,6 +282,9 @@ export default function Navbar() {
           </div>
         </div>
       </header>
+
+      {/* ERD Modal */}
+      <ErdModal isOpen={erdOpen} onClose={() => setErdOpen(false)} />
     </>
   );
 }
