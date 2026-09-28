@@ -13,6 +13,7 @@ import ProductDetail from './pages/ProductDetail';
 import MyOrders from './pages/MyOrders';
 import OrganizerDashboard from './pages/OrganizerDashboard';
 import SellerDashboard from './pages/SellerDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 
@@ -69,6 +70,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute admin>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

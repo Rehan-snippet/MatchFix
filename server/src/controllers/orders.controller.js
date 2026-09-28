@@ -175,7 +175,7 @@ async function cancelOrder(req, res) {
       if (!check.rows.length) throw new Error('Order not found.');
       const order = check.rows[0];
 
-      if (order.customer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && order.customer_id !== req.user.user_id) throw new Error('Unauthorized.');
       if (['cancelled', 'shipped', 'delivered'].includes(order.status)) {
         throw new Error(`Cannot cancel order in "${order.status}" status.`);
       }
@@ -203,11 +203,12 @@ async function cancelOrder(req, res) {
 }
 
 /**
- * PATCH /api/orders/:id/status
+ * PATCH /api/orders/:orderId/items/:productId/status (or /:id/status)
  * DML 33: Uses withTransaction
  */
 async function updateOrderStatus(req, res) {
-  const { id } = req.params;
+  const orderId = req.params.orderId || req.params.id;
+  const productId = req.params.productId;
   const { status } = req.body;
 
   const validStatuses = ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled'];
@@ -217,9 +218,43 @@ async function updateOrderStatus(req, res) {
 
   try {
     await db.withTransaction(async (client) => {
-      const resUpdate = await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', [status, id]);
-      if (resUpdate.rowCount === 0) throw new Error('Order not found.');
-      await client.query('UPDATE order_items SET status = $1 WHERE order_id = $2', [status, id]);
+      if (productId) {
+        // Seller ownership check: seller must own this product (or admin)
+        if (!req.user.is_admin) {
+          const prodCheck = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [productId]);
+          if (!prodCheck.rows.length || prodCheck.rows[0].seller_id !== req.user.user_id) {
+            throw new Error('Unauthorized: You do not own this product.');
+          }
+        }
+
+        const resItem = await client.query(
+          'UPDATE order_items SET status = $1 WHERE order_id = $2 AND product_id = $3 RETURNING *',
+          [status, orderId, productId]
+        );
+        if (resItem.rowCount === 0) throw new Error('Order item not found.');
+
+        // Synchronize parent order status if all items have matching statuses
+        const { rows: allItems } = await client.query(
+          'SELECT status FROM order_items WHERE order_id = $1',
+          [orderId]
+        );
+        if (allItems.length > 0) {
+          if (allItems.every((i) => i.status === 'delivered')) {
+            await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', ['delivered', orderId]);
+          } else if (allItems.every((i) => i.status === 'cancelled')) {
+            await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', ['cancelled', orderId]);
+          } else if (allItems.some((i) => i.status === 'shipped')) {
+            await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', ['shipped', orderId]);
+          } else if (allItems.some((i) => i.status === 'confirmed')) {
+            await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', ['confirmed', orderId]);
+          }
+        }
+      } else {
+        // Fallback for updating entire order (admin or legacy)
+        const resUpdate = await client.query('UPDATE orders SET status = $1 WHERE order_id = $2', [status, orderId]);
+        if (resUpdate.rowCount === 0) throw new Error('Order not found.');
+        await client.query('UPDATE order_items SET status = $1 WHERE order_id = $2', [status, orderId]);
+      }
     });
 
     return res.json({ message: `Order status updated to ${status}.` });

@@ -74,7 +74,7 @@ async function createField(req, res) {
     const field = await db.withTransaction(async (client) => {
       const turf = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1', [turf_id]);
       if (!turf.rows.length) throw new Error('Turf not found.');
-      if (turf.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && turf.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const { rows } = await client.query(
         `INSERT INTO fields (turf_id, name, side_type, surface)
@@ -106,7 +106,7 @@ async function updateField(req, res) {
         [id]
       );
       if (!check.rows.length) throw new Error('Field not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const { rows } = await client.query(
         `UPDATE fields
@@ -140,7 +140,7 @@ async function deleteField(req, res) {
         [id]
       );
       if (!check.rows.length) throw new Error('Field not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('DELETE FROM fields WHERE field_id = $1', [id]);
     });
@@ -170,7 +170,7 @@ async function addPricingRule(req, res) {
         [id]
       );
       if (!check.rows.length) throw new Error('Field not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const { rows } = await client.query(
         `INSERT INTO pricing_rules (field_id, day_of_week, start_time, end_time, hourly_rate)
@@ -209,7 +209,7 @@ async function updatePricingRule(req, res) {
         [ruleId, fieldId]
       );
       if (!check.rows.length) throw new Error('Pricing rule not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const { rows } = await client.query(
         `UPDATE pricing_rules SET hourly_rate = $1 WHERE rule_id = $2 RETURNING *`,
@@ -241,7 +241,7 @@ async function deletePricingRule(req, res) {
         [ruleId, fieldId]
       );
       if (!check.rows.length) throw new Error('Pricing rule not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('DELETE FROM pricing_rules WHERE rule_id = $1', [ruleId]);
     });

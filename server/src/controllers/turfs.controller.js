@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 
 /**
@@ -170,7 +172,7 @@ async function updateTurf(req, res) {
     const turf = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1 FOR UPDATE', [id]);
       if (!check.rows.length) throw new Error('Turf not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const { rows } = await client.query(
         `UPDATE turfs
@@ -205,7 +207,7 @@ async function deleteTurf(req, res) {
     await db.withTransaction(async (client) => {
       const check = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1 FOR UPDATE', [id]);
       if (!check.rows.length) throw new Error('Turf not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('DELETE FROM turfs WHERE turf_id = $1', [id]);
     });
@@ -222,15 +224,16 @@ async function deleteTurf(req, res) {
  */
 async function addTurfImage(req, res) {
   const { id } = req.params;
-  const { url, is_cover = false } = req.body;
+  const is_cover = req.body.is_cover === true || req.body.is_cover === 'true';
+  const url = req.file ? `/uploads/turfs/${req.file.filename}` : req.body.url;
 
-  if (!url) return res.status(400).json({ error: 'Image URL is required.' });
+  if (!url) return res.status(400).json({ error: 'Image file or URL is required.' });
 
   try {
     const image = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1', [id]);
       if (!check.rows.length) throw new Error('Turf not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       if (is_cover) {
         await client.query('UPDATE turf_images SET is_cover = FALSE WHERE turf_id = $1', [id]);
@@ -257,13 +260,13 @@ async function deleteTurfImage(req, res) {
   const { turfId, imageId } = req.params;
 
   try {
-    await db.withTransaction(async (client) => {
+    const deletedImage = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1', [turfId]);
       if (!check.rows.length) throw new Error('Turf not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const delRes = await client.query(
-        'DELETE FROM turf_images WHERE image_id = $1 AND turf_id = $2 RETURNING is_cover',
+        'DELETE FROM turf_images WHERE image_id = $1 AND turf_id = $2 RETURNING url, is_cover',
         [imageId, turfId]
       );
       if (!delRes.rows.length) throw new Error('Image not found.');
@@ -275,7 +278,20 @@ async function deleteTurfImage(req, res) {
           [turfId]
         );
       }
+      return delRes.rows[0];
     });
+
+    // Clean up local disk file if uploaded
+    if (deletedImage?.url && deletedImage.url.startsWith('/uploads/')) {
+      try {
+        const filePath = path.join(__dirname, '..', '..', deletedImage.url.replace(/^\//, ''));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fsErr) {
+        console.warn('Failed to delete turf image from disk:', fsErr.message);
+      }
+    }
 
     return res.json({ message: 'Image deleted successfully.' });
   } catch (err) {
@@ -294,7 +310,7 @@ async function setCoverImage(req, res) {
     await db.withTransaction(async (client) => {
       const check = await client.query('SELECT organizer_id FROM turfs WHERE turf_id = $1', [turfId]);
       if (!check.rows.length) throw new Error('Turf not found.');
-      if (check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('UPDATE turf_images SET is_cover = FALSE WHERE turf_id = $1', [turfId]);
       const resCover = await client.query(

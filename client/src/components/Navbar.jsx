@@ -8,6 +8,7 @@ import {
   Trophy,
   ShoppingBag,
   ShieldCheck,
+  Shield,
   LogOut,
   Calendar,
   Package,
@@ -84,6 +85,17 @@ export default function Navbar() {
                 <span>Gear Shop</span>
               </Link>
 
+              {/* Admin Console Pill */}
+              {user?.is_admin && (
+                <Link
+                  to="/admin"
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3.5 py-2 rounded-full transition shadow-2xs"
+                >
+                  <Shield className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Admin</span>
+                </Link>
+              )}
+
               {/* Language / Region pill */}
               <button
                 type="button"
@@ -126,6 +138,21 @@ export default function Navbar() {
                           </p>
                         </div>
 
+                        {user.is_admin && (
+                          <div className="px-3 py-1.5 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                              <Shield className="w-3 h-3 text-amber-600" /> Super Admin
+                            </span>
+                            <Link
+                              to="/admin"
+                              onClick={() => setMenuOpen(false)}
+                              className="text-[10px] font-extrabold text-amber-800 hover:text-amber-950 uppercase tracking-wider"
+                            >
+                              Console &rarr;
+                            </Link>
+                          </div>
+                        )}
+
                         <div className="py-1">
                           <Link
                             to="/my-bookings"
@@ -164,6 +191,16 @@ export default function Navbar() {
                         <hr className="my-1 border-neutral-100" />
 
                         <div className="py-1">
+                          {user.is_admin && (
+                            <Link
+                              to="/admin"
+                              onClick={() => setMenuOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2 hover:bg-amber-50 text-xs font-bold text-amber-800"
+                            >
+                              <Shield className="w-4 h-4 text-amber-600" />
+                              <span>Admin Operations</span>
+                            </Link>
+                          )}
                           {user.roles?.includes("organizer") && (
                             <Link
                               to="/organizer"

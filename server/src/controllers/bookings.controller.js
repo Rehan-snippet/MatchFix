@@ -138,7 +138,7 @@ async function cancelBooking(req, res) {
       if (!rows.length) throw new Error('Booking not found.');
       const booking = rows[0];
 
-      if (booking.customer_id !== req.user.user_id && !req.user.roles?.includes('organizer')) {
+      if (!req.user.is_admin && booking.customer_id !== req.user.user_id && !req.user.roles?.includes('organizer')) {
         throw new Error('Unauthorized to cancel this booking.');
       }
       if (booking.status === 'cancelled') throw new Error('Booking is already cancelled.');
@@ -176,7 +176,7 @@ async function confirmBooking(req, res) {
       );
 
       if (!rows.length) throw new Error('Booking not found.');
-      if (rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized: Organizer access required.');
+      if (!req.user.is_admin && rows[0].organizer_id !== req.user.user_id) throw new Error('Unauthorized: Organizer access required.');
 
       await client.query(`UPDATE bookings SET status = 'confirmed' WHERE booking_id = $1`, [id]);
     });

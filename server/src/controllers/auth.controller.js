@@ -1,9 +1,7 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'matchfix-super-secret-key-change-in-production';
-const JWT_EXPIRES_IN = '7d';
+const { sign } = require('../utils/jwt');
+const { buildUserPayload } = require('../utils/authPayload');
 
 /**
  * Resolve user roles across subclasses
@@ -58,9 +56,9 @@ async function register(req, res) {
       const passwordHash = await bcrypt.hash(password, 10);
 
       const userRes = await client.query(
-        `INSERT INTO users (name, email, phone, password_hash, is_active)
-         VALUES ($1, LOWER($2), $3, $4, TRUE)
-         RETURNING user_id, name, email, phone, created_at`,
+        `INSERT INTO users (name, email, phone, password_hash, is_active, is_admin)
+         VALUES ($1, LOWER($2), $3, $4, TRUE, FALSE)
+         RETURNING user_id, name, email, phone, is_admin, is_active, created_at`,
         [name, email, phone || null, passwordHash]
       );
       const newUser = userRes.rows[0];
@@ -86,13 +84,11 @@ async function register(req, res) {
       return newUser;
     });
 
-    const roles = await getUserRoles(user.user_id);
-    const token = jwt.sign({ user_id: user.user_id, email: user.email, roles }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
+    const userPayload = await buildUserPayload(user.user_id);
+    const token = sign(userPayload);
 
     return res.status(201).json({
-      user: { ...user, roles },
+      user: userPayload,
       token,
       message: 'Registration successful.',
     });
@@ -113,7 +109,7 @@ async function login(req, res) {
 
   try {
     const { rows } = await db.query(
-      `SELECT user_id, name, email, phone, password_hash, is_active
+      `SELECT user_id, name, email, phone, password_hash, is_active, is_admin
        FROM users
        WHERE LOWER(email) = LOWER($1)`,
       [email]
@@ -134,15 +130,11 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    const roles = await getUserRoles(user.user_id);
-    const token = jwt.sign({ user_id: user.user_id, email: user.email, roles }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
-
-    delete user.password_hash;
+    const userPayload = await buildUserPayload(user.user_id);
+    const token = sign(userPayload);
 
     return res.json({
-      user: { ...user, roles },
+      user: userPayload,
       token,
       message: 'Login successful.',
     });
@@ -152,21 +144,25 @@ async function login(req, res) {
 }
 
 /**
+ * POST /api/auth/refresh
+ */
+async function refresh(req, res) {
+  try {
+    const userPayload = await buildUserPayload(req.user.user_id);
+    const token = sign(userPayload);
+    return res.json({ user: userPayload, token });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/auth/me
  */
 async function getMe(req, res) {
   try {
-    const { rows } = await db.query(
-      `SELECT user_id, name, email, phone, is_active, created_at
-       FROM users
-       WHERE user_id = $1`,
-      [req.user.user_id]
-    );
-
-    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
-
-    const roles = await getUserRoles(req.user.user_id);
-    return res.json({ user: { ...rows[0], roles } });
+    const userPayload = await buildUserPayload(req.user.user_id);
+    return res.json({ user: userPayload });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -259,6 +255,7 @@ async function changePassword(req, res) {
 module.exports = {
   register,
   login,
+  refresh,
   getMe,
   updateProfile,
   changePassword,

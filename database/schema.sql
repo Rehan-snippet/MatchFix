@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(30),
   password_hash TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -192,6 +193,9 @@ CREATE TABLE IF NOT EXISTS payments (
     (booking_id IS NULL AND order_id IS NOT NULL)
   )
 );
+
+-- Ensure is_admin column exists on users table for existing databases
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Drop old rigid index if present
 DROP INDEX IF EXISTS one_active_booking_per_slot;

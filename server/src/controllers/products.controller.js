@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 
 /**
@@ -160,7 +162,7 @@ async function updateProduct(req, res) {
     const product = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1 FOR UPDATE', [id]);
       if (!check.rows.length) throw new Error('Product not found.');
-      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized: You do not own this product listing.');
+      if (!req.user.is_admin && check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized: You do not own this product listing.');
 
       const { rows } = await client.query(
         `UPDATE products
@@ -194,7 +196,7 @@ async function deleteProduct(req, res) {
     await db.withTransaction(async (client) => {
       const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1 FOR UPDATE', [id]);
       if (!check.rows.length) throw new Error('Product not found.');
-      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('DELETE FROM products WHERE product_id = $1', [id]);
     });
@@ -211,15 +213,16 @@ async function deleteProduct(req, res) {
  */
 async function addProductImage(req, res) {
   const { id } = req.params;
-  const { url, is_cover = false } = req.body;
+  const is_cover = req.body.is_cover === true || req.body.is_cover === 'true';
+  const url = req.file ? `/uploads/products/${req.file.filename}` : req.body.url;
 
-  if (!url) return res.status(400).json({ error: 'Image URL is required.' });
+  if (!url) return res.status(400).json({ error: 'Image file or URL is required.' });
 
   try {
     const image = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [id]);
       if (!check.rows.length) throw new Error('Product not found.');
-      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       if (is_cover) {
         await client.query('UPDATE product_images SET is_cover = FALSE WHERE product_id = $1', [id]);
@@ -246,13 +249,13 @@ async function deleteProductImage(req, res) {
   const { productId, imageId } = req.params;
 
   try {
-    await db.withTransaction(async (client) => {
+    const deletedImage = await db.withTransaction(async (client) => {
       const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [productId]);
       if (!check.rows.length) throw new Error('Product not found.');
-      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       const del = await client.query(
-        'DELETE FROM product_images WHERE image_id = $1 AND product_id = $2 RETURNING is_cover',
+        'DELETE FROM product_images WHERE image_id = $1 AND product_id = $2 RETURNING url, is_cover',
         [imageId, productId]
       );
       if (!del.rows.length) throw new Error('Image not found.');
@@ -264,7 +267,20 @@ async function deleteProductImage(req, res) {
           [productId]
         );
       }
+      return del.rows[0];
     });
+
+    // Clean up local disk file if uploaded
+    if (deletedImage?.url && deletedImage.url.startsWith('/uploads/')) {
+      try {
+        const filePath = path.join(__dirname, '..', '..', deletedImage.url.replace(/^\//, ''));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fsErr) {
+        console.warn('Failed to delete product image from disk:', fsErr.message);
+      }
+    }
 
     return res.json({ message: 'Product image deleted.' });
   } catch (err) {
@@ -283,7 +299,7 @@ async function setProductCoverImage(req, res) {
     await db.withTransaction(async (client) => {
       const check = await client.query('SELECT seller_id FROM products WHERE product_id = $1', [productId]);
       if (!check.rows.length) throw new Error('Product not found.');
-      if (check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
+      if (!req.user.is_admin && check.rows[0].seller_id !== req.user.user_id) throw new Error('Unauthorized.');
 
       await client.query('UPDATE product_images SET is_cover = FALSE WHERE product_id = $1', [productId]);
       const resCover = await client.query(

@@ -6,7 +6,7 @@ const { getRolesForUser } = require('../utils/roles');
 // GET /api/users/me  — base profile + every role-specific record the user holds
 const getMe = asyncHandler(async (req, res) => {
   const { rows } = await db.query(
-    'SELECT user_id, name, email, phone, is_active, created_at FROM users WHERE user_id = $1',
+    'SELECT user_id, name, email, phone, is_admin, is_active, created_at FROM users WHERE user_id = $1',
     [req.user.user_id]
   );
   if (!rows[0]) throw new ApiError(404, 'User not found');
@@ -19,6 +19,7 @@ const getMe = asyncHandler(async (req, res) => {
 
   res.json({
     ...rows[0],
+    is_admin: rows[0].is_admin === true,
     roles: await getRolesForUser(req.user.user_id),
     organizer: organizer.rows[0] || null,
     seller: seller.rows[0] || null,
@@ -34,7 +35,7 @@ const updateMe = asyncHandler(async (req, res) => {
     const { rows } = await client.query(
       `UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone)
        WHERE user_id = $3
-       RETURNING user_id, name, email, phone, is_active, created_at`,
+       RETURNING user_id, name, email, phone, is_admin, is_active, created_at`,
       [name, phone, req.user.user_id]
     );
     return rows[0];
