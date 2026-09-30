@@ -7,7 +7,7 @@ const { getGateway } = require('../gateways');
  * Validates ownership and state before intent creation.
  */
 async function initiatePayment(req, res) {
-  const { booking_id, order_id, amount, method } = req.body;
+  const { booking_id, order_id, amount, method, purpose } = req.body;
 
   if ((!booking_id && !order_id) || (booking_id && order_id)) {
     return res.status(400).json({ error: 'Must provide either booking_id OR order_id, not both.' });
@@ -19,6 +19,7 @@ async function initiatePayment(req, res) {
   const numAmount = Number(amount);
   const numBookingId = booking_id ? Number(booking_id) : null;
   const numOrderId = order_id ? Number(order_id) : null;
+  const intentPurpose = purpose === 'advance' ? 'advance' : 'full';
 
   try {
     // Validate target ownership & status
@@ -31,7 +32,14 @@ async function initiatePayment(req, res) {
       const b = bRes.rows[0];
       if (b.customer_id !== req.user.user_id) return res.status(403).json({ error: 'Unauthorized.' });
       if (b.status === 'confirmed') return res.status(400).json({ error: 'Booking is already paid and confirmed.' });
+      if (b.status === 'advance_paid') return res.status(400).json({ error: 'Advance payment already settled for this booking.' });
       if (b.status === 'cancelled') return res.status(400).json({ error: 'Cannot pay for a cancelled booking.' });
+      if (intentPurpose === 'advance' && numAmount >= Number(b.total_amount)) {
+        return res.status(400).json({ error: 'Advance amount must be less than total booking amount.' });
+      }
+      if (intentPurpose === 'full' && numAmount < Number(b.total_amount)) {
+        return res.status(400).json({ error: 'Full payment amount must cover the total booking amount.' });
+      }
     }
 
     if (numOrderId) {
@@ -43,12 +51,19 @@ async function initiatePayment(req, res) {
       const o = oRes.rows[0];
       if (o.customer_id !== req.user.user_id) return res.status(403).json({ error: 'Unauthorized.' });
       if (o.status === 'cancelled') return res.status(400).json({ error: 'Cannot pay for a cancelled order.' });
+      if (o.status === 'advance_paid') return res.status(400).json({ error: 'Advance payment already settled for this order.' });
       // Check if already paid
       const pRes = await db.query(
-        "SELECT payment_id FROM payments WHERE order_id = $1 AND status = 'completed'",
+        "SELECT payment_id FROM payments WHERE order_id = $1 AND status = 'completed' AND purpose = 'full'",
         [numOrderId]
       );
       if (pRes.rows.length) return res.status(400).json({ error: 'Order is already settled.' });
+      if (intentPurpose === 'advance' && numAmount >= Number(o.total_amount)) {
+        return res.status(400).json({ error: 'Advance amount must be less than total order amount.' });
+      }
+      if (intentPurpose === 'full' && numAmount < Number(o.total_amount)) {
+        return res.status(400).json({ error: 'Full payment amount must cover the total order amount.' });
+      }
     }
 
     const gateway = getGateway();
@@ -59,15 +74,16 @@ async function initiatePayment(req, res) {
       amount: numAmount,
       currency: 'BDT',
       method: method || 'sandbox_card',
+      purpose: intentPurpose,
     };
 
     const { gateway_ref, checkout_url, status } = await gateway.initiate(intentData);
 
     const { rows } = await db.query(
       `INSERT INTO payment_intents
-        (user_id, booking_id, order_id, amount, currency, method, gateway, gateway_ref, checkout_url, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'initiated')
-       RETURNING intent_id, gateway_ref, checkout_url, expires_at`,
+        (user_id, booking_id, order_id, amount, currency, method, gateway, gateway_ref, checkout_url, status, purpose)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'initiated', $10)
+       RETURNING intent_id, gateway_ref, checkout_url, expires_at, purpose`,
       [
         intentData.user_id,
         intentData.booking_id,
@@ -78,6 +94,7 @@ async function initiatePayment(req, res) {
         process.env.PAYMENT_GATEWAY || 'sandbox',
         gateway_ref,
         checkout_url,
+        intentPurpose,
       ]
     );
 
@@ -86,7 +103,10 @@ async function initiatePayment(req, res) {
       gateway_ref: rows[0].gateway_ref,
       checkout_url: rows[0].checkout_url,
       expires_at: rows[0].expires_at,
-      message: 'Payment intent created. Complete sandbox payment to confirm.',
+      purpose: rows[0].purpose,
+      message: intentPurpose === 'advance'
+        ? 'Advance payment intent created. Complete payment to secure booking/order.'
+        : 'Payment intent created. Complete sandbox payment to confirm.',
     });
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -142,7 +162,7 @@ async function confirmSandboxPayment(req, res) {
             intent.order_id ? Number(intent.order_id) : null,
             Number(intent.amount),
             intent.method || 'card',
-            'full',
+            intent.purpose || 'full',
           ]
         );
         paymentId = spResult.rows[0]?.p_payment_id;
@@ -155,10 +175,16 @@ async function confirmSandboxPayment(req, res) {
         );
       });
 
+      const isAdvance = intent.purpose === 'advance';
+
       return res.json({
+        success: true,
         status: 'completed',
         payment_id: paymentId,
-        message: '🎉 Payment successful! Transaction has settled and booking/order is confirmed.',
+        is_advance: isAdvance,
+        message: isAdvance
+          ? '🎉 Advance payment successful! The remaining cash balance can be settled at the venue or upon delivery.'
+          : '🎉 Payment successful! Transaction has settled and booking/order is confirmed.',
       });
     } else {
       await db.query(

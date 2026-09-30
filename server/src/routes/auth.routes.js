@@ -7,11 +7,15 @@ const {
   refresh,
   getMe, 
   updateProfile, 
-  changePassword 
+  changePassword,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/auth.controller');
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.post('/refresh', requireAuth, refresh);
 router.get('/me', requireAuth, getMe);
 router.patch('/profile', requireAuth, updateProfile);

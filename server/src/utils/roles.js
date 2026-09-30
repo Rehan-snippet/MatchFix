@@ -6,8 +6,8 @@ const db = require('../config/db');
 // requireRole().
 async function getRolesForUser(userId) {
   const [org, sel, cus] = await Promise.all([
-    db.query('SELECT 1 FROM organizers WHERE user_id = $1', [userId]),
-    db.query('SELECT 1 FROM sellers WHERE user_id = $1', [userId]),
+    db.query("SELECT approval_status FROM organizers WHERE user_id = $1 AND approval_status = 'approved'", [userId]),
+    db.query("SELECT approval_status FROM sellers WHERE user_id = $1 AND approval_status = 'approved'", [userId]),
     db.query('SELECT 1 FROM customers WHERE user_id = $1', [userId]),
   ]);
   const roles = [];

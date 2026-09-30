@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import SandboxPaymentModal from '../components/SandboxPaymentModal';
 import {
   Star,
@@ -11,16 +12,20 @@ import {
   RotateCcw,
   ArrowLeft,
   ShoppingBag,
+  ShoppingCart,
   CheckCircle2,
   MapPin,
   Phone,
   Package,
 } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { addToCart, cartCount } = useCart();
   const [product, setProduct] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [qty, setQty] = useState(1);
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
@@ -41,6 +46,13 @@ export default function ProductDetail() {
     if (user?.customer?.default_address) setAddress(user.customer.default_address);
     if (user?.phone) setPhone(user.phone);
   }, [user]);
+
+  function handleAddToCart() {
+    if (!product || product.stock === 0) return;
+    addToCart(product, qty);
+    setMessage(`Added ${qty} × "${product.title}" to your cart.`);
+    setTimeout(() => setMessage(''), 4000);
+  }
 
   async function handleBuy() {
     setMessage('');
@@ -110,9 +122,13 @@ export default function ProductDetail() {
         <div className="mt-2.5 flex flex-wrap items-center gap-3 text-xs text-neutral-600">
           <div className="flex items-center gap-1 font-bold text-neutral-900">
             <Star className="w-4 h-4 fill-amber-400 stroke-amber-400" />
-            <span>{product.avg_rating || '5.0'}</span>
+            <span>
+              {Number(product.avg_rating || product.average_rating) > 0
+                ? Number(product.avg_rating || product.average_rating).toFixed(1)
+                : 'New'}
+            </span>
             <span className="text-neutral-500 font-normal">
-              ({product.reviews?.length || 0} reviews)
+              ({product.reviews?.length || product.review_count || 0} reviews)
             </span>
           </div>
           <span>·</span>
@@ -127,17 +143,42 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Hero Showcase Image */}
-      <div className="rounded-3xl overflow-hidden aspect-[16/9] sm:aspect-[2.2/1] bg-neutral-100 border border-neutral-200/80 mb-10 shadow-xs">
-        <img
-          src={
-            product.images?.[0]?.url ||
-            'https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=1200&q=80'
-          }
-          alt={product.title}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      {/* Hero Showcase Image & Gallery */}
+      {(() => {
+        const rawList = product.images?.length
+          ? product.images.map((img) => (typeof img === 'string' ? img : img.url))
+          : [product.cover_image || 'https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=1200&q=80'];
+        const images = rawList.filter(Boolean).map((u) => getImageUrl(u));
+        const activeImg = images[selectedImageIndex] || images[0];
+
+        return (
+          <div className="space-y-3 mb-10">
+            <div className="rounded-3xl overflow-hidden aspect-[16/9] sm:aspect-[2.2/1] bg-neutral-100 border border-neutral-200/80 shadow-xs">
+              <img
+                src={activeImg}
+                alt={product.title}
+                className="w-full h-full object-cover transition-all duration-300"
+              />
+            </div>
+            {images.length > 1 && (
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`w-16 h-16 rounded-2xl overflow-hidden border-2 flex-shrink-0 transition cursor-pointer shadow-2xs ${
+                      idx === selectedImageIndex ? 'border-[#16a34a] scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* 2-Column Airbnb Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -196,7 +237,11 @@ export default function ProductDetail() {
               </h3>
               <div className="flex items-center gap-1 text-xs font-bold text-neutral-800">
                 <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                <span>{product.avg_rating || '5.0'} rating</span>
+                <span>
+                  {Number(product.avg_rating || product.average_rating) > 0
+                    ? `${Number(product.avg_rating || product.average_rating).toFixed(1)} rating`
+                    : 'New product'}
+                </span>
               </div>
             </div>
 
@@ -209,7 +254,7 @@ export default function ProductDetail() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-neutral-900">
-                        {r.reviewer_name}
+                        {r.customer_name || r.reviewer_name || 'Verified Buyer'}
                       </span>
                       <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800">
                         <Star className="w-3 h-3 fill-amber-400 stroke-amber-400" />
@@ -338,9 +383,17 @@ export default function ProductDetail() {
 
             {/* Notifications */}
             {message && (
-              <div className="p-3 rounded-2xl bg-green-50 border border-green-200 text-green-800 text-xs font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#16a34a] flex-shrink-0" />
-                <span>{message}</span>
+              <div className="p-3.5 rounded-2xl bg-green-50 border border-green-200 text-green-900 text-xs font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#16a34a] flex-shrink-0" />
+                  <span>{message}</span>
+                </div>
+                <Link
+                  to="/cart"
+                  className="px-2.5 py-1 rounded-xl bg-[#16a34a] text-white text-[11px] font-bold hover:bg-[#15803d] transition whitespace-nowrap"
+                >
+                  View Cart
+                </Link>
               </div>
             )}
             {errorMsg && (
@@ -349,19 +402,36 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Buy CTA */}
-            <button
-              type="button"
-              onClick={handleBuy}
-              disabled={busy || product.stock === 0}
-              className="w-full py-3.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] disabled:bg-neutral-300 text-white font-bold text-sm shadow-md transition active:scale-[0.98] cursor-pointer"
-            >
-              {busy ? 'Processing order…' : product.stock === 0 ? 'Out of Stock' : 'Confirm Order & Pay'}
-            </button>
+            {/* CTAs: Add to Cart + Buy Now */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={product.stock === 0}
+                className="w-full py-3.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] disabled:bg-neutral-300 text-white font-extrabold text-sm shadow-md transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>{product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
+              </button>
 
-            <p className="text-[11px] text-center text-neutral-500">
-              Safe & secure payment. View tracking status in My Orders anytime.
-            </p>
+              <button
+                type="button"
+                onClick={handleBuy}
+                disabled={busy || product.stock === 0}
+                className="w-full py-3 rounded-2xl border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-800 font-bold text-xs transition cursor-pointer"
+              >
+                {busy ? 'Processing order…' : 'Instant Checkout (Buy Now)'}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-neutral-500 pt-1">
+              <span>Safe & secure SSL payment</span>
+              {cartCount > 0 && (
+                <Link to="/cart" className="font-bold text-[#16a34a] hover:underline">
+                  Cart ({cartCount}) &rarr;
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>

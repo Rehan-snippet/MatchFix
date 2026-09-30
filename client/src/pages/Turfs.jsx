@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import TurfCard from '../components/TurfCard';
@@ -13,6 +13,8 @@ export default function Turfs() {
   const [turfs, setTurfs] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   // Search query params
   const areaId = searchParams.get('area_id') || '';
@@ -71,19 +73,42 @@ export default function Turfs() {
     api.get('/areas').then((res) => setAreas(res.data)).catch(() => {});
   }, []);
 
+  const observer = React.useRef();
+  const lastElementRef = React.useCallback(node => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prev => prev + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore]);
+
+  // Reset page when search params change
+  useEffect(() => {
+    setTurfs([]);
+    setPage(1);
+    setHasMore(true);
+  }, [areaId, keyword]);
+
   // Fetch turfs from API
   useEffect(() => {
+    if (!hasMore) return;
     setLoading(true);
-    const params = {};
+    const params = { page, limit: 12 };
     if (areaId) params.area_id = areaId;
     if (keyword) params.keyword = keyword;
 
     api
       .get('/turfs', { params })
-      .then((res) => setTurfs(res.data))
+      .then((res) => {
+        if (res.data.length < 12) setHasMore(false);
+        setTurfs((prev) => [...prev, ...res.data]);
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
-  }, [areaId, keyword]);
+  }, [areaId, keyword, page]);
 
   // Handle category click from CategoryBar
   function handleSelectCategory(cat) {
@@ -277,18 +302,42 @@ export default function Turfs() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
-                {filteredTurfs.map((turf) => (
-                  <TurfCard
-                    key={turf.turf_id}
-                    turf={turf}
-                    isHovered={hoveredTurfId === turf.turf_id}
-                    onHover={(id) => setHoveredTurfId(id)}
-                    onLeave={() => setHoveredTurfId(null)}
-                    isFavorite={favorites.includes(turf.turf_id)}
-                    onToggleFavorite={toggleFavorite}
-                    includeFees={includeFees}
-                  />
-                ))}
+                {filteredTurfs.map((turf, index) => {
+                  if (filteredTurfs.length === index + 1) {
+                    return (
+                      <div ref={lastElementRef} key={turf.turf_id}>
+                        <TurfCard
+                          turf={turf}
+                          isHovered={hoveredTurfId === turf.turf_id}
+                          onHover={(id) => setHoveredTurfId(id)}
+                          onLeave={() => setHoveredTurfId(null)}
+                          isFavorite={favorites.includes(turf.turf_id)}
+                          onToggleFavorite={toggleFavorite}
+                          includeFees={includeFees}
+                        />
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <TurfCard
+                        key={turf.turf_id}
+                        turf={turf}
+                        isHovered={hoveredTurfId === turf.turf_id}
+                        onHover={(id) => setHoveredTurfId(id)}
+                        onLeave={() => setHoveredTurfId(null)}
+                        isFavorite={favorites.includes(turf.turf_id)}
+                        onToggleFavorite={toggleFavorite}
+                        includeFees={includeFees}
+                      />
+                    );
+                  }
+                })}
+              </div>
+            )}
+            
+            {loading && page > 1 && (
+              <div className="py-6 text-center text-neutral-500 font-semibold animate-pulse">
+                Loading more turfs...
               </div>
             )}
           </div>

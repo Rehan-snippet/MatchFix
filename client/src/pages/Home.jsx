@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import AirbnbSearchCapsule from '../components/SearchCapsule';
-import CategoryBar from '../components/CategoryBar';
 import TurfCard from '../components/TurfCard';
 import { ArrowRight, Trophy, Sparkles, Shield, ShoppingBag, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function Home() {
   const [turfs, setTurfs] = useState([]);
@@ -47,20 +47,6 @@ export default function Home() {
 
   return (
     <div className="w-full bg-white pb-20">
-      {/* 1. Category Bar directly under header */}
-      <CategoryBar
-        selectedCategory="all"
-        onSelectCategory={(cat) => {
-          if (cat.isLink) window.location.href = cat.isLink;
-          else if (cat.id === 'all') window.location.href = '/turfs';
-          else if (cat.filterKey === 'side_type') window.location.href = `/turfs?side_type=${cat.filterVal}`;
-          else if (cat.filterKey === 'surface') window.location.href = `/turfs?surface=${cat.filterVal}`;
-          else window.location.href = '/turfs';
-        }}
-        includeFees={includeFees}
-        onToggleIncludeFees={() => setIncludeFees(!includeFees)}
-      />
-
       <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* 2. Hero Header with OG Logo, subtitle & green ERD pill button */}
         <div className="pt-8 pb-10 text-center max-w-3xl mx-auto">
@@ -206,10 +192,7 @@ export default function Home() {
                 >
                   <div className="aspect-square bg-neutral-100 overflow-hidden relative">
                     <img
-                      src={
-                        p.cover_image ||
-                        'https://images.unsplash.com/photo-1511886929837-354d827aae26?w=600'
-                      }
+                      src={getImageUrl(p.cover_image, 'https://images.unsplash.com/photo-1511886929837-354d827aae26?w=600')}
                       alt={p.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />

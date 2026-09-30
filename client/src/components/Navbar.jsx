@@ -1,22 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 import {
   Menu,
   User,
   Globe,
   Trophy,
   ShoppingBag,
+  ShoppingCart,
   ShieldCheck,
   Shield,
   LogOut,
   Calendar,
   Package,
+  Heart,
 } from "lucide-react";
-import AirbnbSearchCapsule from "./SearchCapsule";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { cartCount } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,13 +60,8 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* 2. Center: Search Capsule */}
-            <div className="flex-1 max-w-xl mx-2">
-              <AirbnbSearchCapsule isHero={false} />
-            </div>
-
             {/* 3. Right: Host actions & User profile capsule */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
               {/* Host a turf / Organizer link */}
               <Link
                 to={
@@ -104,6 +102,20 @@ export default function Navbar() {
               >
                 <Globe className="w-4 h-4" />
               </button>
+
+              {/* Shopping Cart Pill */}
+              <Link
+                to="/cart"
+                className="relative p-2.5 text-neutral-700 hover:bg-neutral-100 rounded-full transition flex items-center justify-center cursor-pointer"
+                title="Shopping Cart"
+              >
+                <ShoppingCart className="w-5 h-5 text-neutral-700" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 bg-[#16a34a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </Link>
 
               {/* User Dropdown Capsule */}
               <div ref={menuRef} className="relative">
@@ -171,6 +183,21 @@ export default function Navbar() {
                             <span>My Orders</span>
                           </Link>
                           <Link
+                            to="/cart"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center justify-between px-4 py-2.5 hover:bg-neutral-100 font-medium text-neutral-800"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <ShoppingCart className="w-4 h-4 text-neutral-500" />
+                              <span>Shopping Cart</span>
+                            </div>
+                            {cartCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#16a34a] border border-emerald-200 text-[10px] font-black">
+                                {cartCount}
+                              </span>
+                            )}
+                          </Link>
+                          <Link
                             to="/turfs"
                             onClick={() => setMenuOpen(false)}
                             className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-neutral-100 font-medium text-neutral-800"
@@ -185,6 +212,14 @@ export default function Navbar() {
                           >
                             <ShoppingBag className="w-4 h-4 text-neutral-500" />
                             <span>Gear Marketplace</span>
+                          </Link>
+                          <Link
+                            to="/wishlist"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-neutral-100 font-medium text-neutral-800"
+                          >
+                            <Heart className="w-4 h-4 text-neutral-500" />
+                            <span>My Wishlist</span>
                           </Link>
                         </div>
 
@@ -276,6 +311,18 @@ export default function Navbar() {
                             className="block px-4 py-2 text-xs text-neutral-700 hover:bg-neutral-100"
                           >
                             Shop Football Gear
+                          </Link>
+                          <Link
+                            to="/cart"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex items-center justify-between px-4 py-2 text-xs text-neutral-700 hover:bg-neutral-100"
+                          >
+                            <span>Shopping Cart</span>
+                            {cartCount > 0 && (
+                              <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-[#16a34a] border border-emerald-200 text-[10px] font-black">
+                                {cartCount}
+                              </span>
+                            )}
                           </Link>
                           <Link
                             to="/login"

@@ -6,7 +6,7 @@ const db = require('../config/db');
  * GET /api/turfs
  */
 async function listTurfs(req, res) {
-  const { area_id, min_rate, max_rate, search } = req.query;
+  const { area_id, min_rate, max_rate, search, organizer_id, status, page = 1, limit = 100 } = req.query;
 
   try {
     let queryText = `
@@ -18,10 +18,21 @@ async function listTurfs(req, res) {
         t.latitude,
         t.longitude,
         t.description,
+        t.approval_status,
+        t.rejection_reason,
         t.created_at,
         a.name AS area_name,
         u.name AS organizer_name,
         fn_turf_avg_rating(t.turf_id) AS average_rating,
+        fn_turf_avg_rating(t.turf_id) AS rating,
+        (
+          SELECT COUNT(DISTINCT tr.review_id)::INT
+          FROM turf_reviews tr
+          JOIN bookings b ON tr.booking_id = b.booking_id
+          JOIN booking_slots bs ON b.booking_id = bs.booking_id
+          JOIN fields f ON bs.field_id = f.field_id
+          WHERE f.turf_id = t.turf_id AND b.status <> 'cancelled'
+        ) AS review_count,
         (
           SELECT ti.url FROM turf_images ti
           WHERE ti.turf_id = t.turf_id AND ti.is_cover = TRUE
@@ -53,8 +64,27 @@ async function listTurfs(req, res) {
       params.push(`%${search}%`);
       queryText += ` AND (t.name ILIKE $${params.length} OR t.address ILIKE $${params.length})`;
     }
+    if (organizer_id) {
+      params.push(organizer_id);
+      queryText += ` AND t.organizer_id = $${params.length}`;
+    }
+    if (status) {
+      params.push(status);
+      queryText += ` AND t.approval_status = $${params.length}`;
+    } else if (!organizer_id) {
+      queryText += ` AND t.approval_status = 'approved'`;
+    }
 
     queryText += ` ORDER BY t.created_at DESC`;
+
+    const limitVal = parseInt(limit, 10);
+    const offsetVal = (parseInt(page, 10) - 1) * limitVal;
+    
+    params.push(limitVal);
+    queryText += ` LIMIT $${params.length}`;
+    
+    params.push(offsetVal);
+    queryText += ` OFFSET $${params.length}`;
 
     const { rows } = await db.query(queryText, params);
     return res.json(rows);
@@ -81,7 +111,22 @@ async function getTurf(req, res) {
           FROM turf_images ti WHERE ti.turf_id = t.turf_id
         ) AS images,
         (
-          SELECT json_agg(json_build_object('field_id', f.field_id, 'name', f.name, 'surface', f.surface, 'side_type', f.side_type))
+          SELECT COALESCE(json_agg(json_build_object(
+            'field_id', f.field_id,
+            'name', f.name,
+            'surface', f.surface,
+            'side_type', f.side_type,
+            'pricing_rules', (
+              SELECT COALESCE(json_agg(json_build_object(
+                'rule_id', pr.rule_id,
+                'day_of_week', pr.day_of_week,
+                'start_time', pr.start_time,
+                'end_time', pr.end_time,
+                'hourly_rate', pr.hourly_rate
+              ) ORDER BY pr.day_of_week, pr.start_time), '[]'::json)
+              FROM pricing_rules pr WHERE pr.field_id = f.field_id
+            )
+          ) ORDER BY f.field_id), '[]'::json)
           FROM fields f WHERE f.turf_id = t.turf_id
         ) AS fields,
         (
@@ -137,8 +182,8 @@ async function createTurf(req, res) {
   try {
     const turf = await db.withTransaction(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO turfs (organizer_id, area_id, name, address, hourly_rate, latitude, longitude, description)
-         VALUES ($1, $2, $3, $4, COALESCE($5, 1200.00), $6, $7, $8)
+        `INSERT INTO turfs (organizer_id, area_id, name, address, hourly_rate, latitude, longitude, description, approval_status)
+         VALUES ($1, $2, $3, $4, COALESCE($5, 1200.00), $6, $7, $8, 'pending')
          RETURNING *`,
         [req.user.user_id, area_id, name, address, hourly_rate, latitude || null, longitude || null, description || null]
       );

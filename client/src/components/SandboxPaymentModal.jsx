@@ -42,6 +42,8 @@ export default function SandboxPaymentModal({
   orderId,
   amount,
   title,
+  purpose = 'full',
+  balanceAmount = 0,
   onSuccess,
   onClose,
 }) {
@@ -92,6 +94,7 @@ export default function SandboxPaymentModal({
         order_id: orderId || undefined,
         amount: numAmount,
         method: 'sandbox_card',
+        purpose: purpose || 'full',
       });
 
       const { intent_id } = intentRes.data;
@@ -174,7 +177,7 @@ export default function SandboxPaymentModal({
               <div className="p-4 rounded-2xl bg-neutral-900 text-white flex items-center justify-between shadow-xs">
                 <div>
                   <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block">
-                    Total Payable Amount
+                    {purpose === 'advance' ? 'Online Advance Due Now (20%)' : 'Total Payable Amount'}
                   </span>
                   <span className="text-2xl sm:text-3xl font-black text-white">
                     ৳{numAmount.toLocaleString()}
@@ -185,6 +188,20 @@ export default function SandboxPaymentModal({
                   <span>Secure 256-bit</span>
                 </div>
               </div>
+
+              {purpose === 'advance' && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="font-bold flex items-center justify-between">
+                    <span>💵 Advance Payment (20%)</span>
+                    <span className="font-extrabold text-[#16a34a]">৳{numAmount.toLocaleString()}</span>
+                  </div>
+                  {balanceAmount > 0 && (
+                    <p className="text-[11px] text-amber-800">
+                      Remaining cash balance of <strong>৳{Number(balanceAmount).toLocaleString()}</strong> will be paid in cash upon delivery or at the venue.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Sandbox Quick Test Cards */}
               <div className="space-y-2">

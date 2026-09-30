@@ -14,12 +14,22 @@ async function buildUserPayload(userId, client = db) {
   );
   if (!rows[0]) throw new Error('User not found');
   const roles = await getRolesForUser(userId);
+
+  const [orgRes, selRes, cusRes] = await Promise.all([
+    client.query('SELECT trade_licence, payout_account, approval_status FROM organizers WHERE user_id = $1', [userId]),
+    client.query('SELECT shop_name, payout_account, approval_status FROM sellers WHERE user_id = $1', [userId]),
+    client.query('SELECT default_address FROM customers WHERE user_id = $1', [userId]),
+  ]);
+
   return {
     user_id: rows[0].user_id,
     name: rows[0].name,
     email: rows[0].email,
     phone: rows[0].phone,
     roles,
+    organizer: orgRes.rows[0] || null,
+    seller: selRes.rows[0] || null,
+    customer: cusRes.rows[0] || null,
     is_admin: rows[0].is_admin === true,
     is_active: rows[0].is_active,
     created_at: rows[0].created_at,

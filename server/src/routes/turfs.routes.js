@@ -9,6 +9,7 @@ const {
   deleteTurf,
   addTurfImage,
   deleteTurfImage,
+  setCoverImage,
 } = require('../controllers/turfs.controller');
 
 router.get('/', listTurfs);
@@ -20,5 +21,6 @@ router.delete('/:id', requireAuth, requireRole('organizer'), deleteTurf);
 
 router.post('/:id/images', requireAuth, requireRole('organizer'), upload.single('image'), addTurfImage);
 router.delete('/:turfId/images/:imageId', requireAuth, requireRole('organizer'), deleteTurfImage);
+router.patch('/:turfId/images/:imageId/cover', requireAuth, requireRole('organizer'), setCoverImage);
 
 module.exports = router;

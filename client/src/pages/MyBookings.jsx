@@ -74,6 +74,7 @@ export default function MyBookings() {
   const filtered = bookings.filter((b) => {
     if (tab === 'all') return true;
     if (tab === 'confirmed') return b.status === 'confirmed';
+    if (tab === 'advance_paid') return b.status === 'advance_paid';
     if (tab === 'pending') return b.status === 'pending';
     if (tab === 'cancelled') return b.status === 'cancelled';
     return true;
@@ -100,6 +101,7 @@ export default function MyBookings() {
         {[
           { id: 'all', label: 'All Bookings' },
           { id: 'confirmed', label: 'Confirmed Matches' },
+          { id: 'advance_paid', label: 'Advance Paid' },
           { id: 'pending', label: 'Pending Payment' },
           { id: 'cancelled', label: 'Cancelled' },
         ].map((t) => (
@@ -149,7 +151,7 @@ export default function MyBookings() {
             >
               {/* Left Details */}
               <div className="space-y-3 flex-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-mono text-xs font-bold text-neutral-500">
                     #{String(b.booking_id).padStart(6, '0')}
                   </span>
@@ -157,13 +159,20 @@ export default function MyBookings() {
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                       b.status === 'confirmed'
                         ? 'bg-green-50 text-[#16a34a] border border-green-200'
+                        : b.status === 'advance_paid'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-300'
                         : b.status === 'pending'
                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
                         : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
                     }`}
                   >
-                    {b.status}
+                    {b.status === 'advance_paid' ? 'Advance Paid' : b.status}
                   </span>
+                  {b.payment_method === 'cash_advance' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-200">
+                      Cash at Venue
+                    </span>
+                  )}
                 </div>
 
                 {/* Slots */}
@@ -188,12 +197,27 @@ export default function MyBookings() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-neutral-500">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
                   <span>
                     Total: <strong className="text-neutral-900 text-sm">৳{Number(b.total_amount).toLocaleString()}</strong>
                   </span>
-                  <span>·</span>
-                  <span>Payment: {b.payments?.length ? 'Paid' : 'Unpaid'}</span>
+                  {b.payment_method === 'cash_advance' ? (
+                    <>
+                      <span>·</span>
+                      <span className="text-emerald-700 font-semibold">
+                        Advance Paid: ৳{Number(b.advance_amount || 0).toLocaleString()}
+                      </span>
+                      <span>·</span>
+                      <span className="text-amber-800 font-bold">
+                        Cash Due at Venue: ৳{Number(b.cash_balance || 0).toLocaleString()}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>·</span>
+                      <span>Payment: {b.payments?.length ? 'Paid' : 'Unpaid'}</span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -207,7 +231,13 @@ export default function MyBookings() {
                     className="px-5 py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>{busyId === b.booking_id ? 'Processing…' : 'Pay Now'}</span>
+                    <span>
+                      {busyId === b.booking_id
+                        ? 'Processing…'
+                        : b.payment_method === 'cash_advance'
+                        ? `Pay Advance (৳${Number(b.advance_amount || Math.ceil(b.total_amount * 0.20)).toLocaleString()})`
+                        : 'Pay Now'}
+                    </span>
                   </button>
                 )}
 
@@ -336,7 +366,17 @@ export default function MyBookings() {
       {paymentBooking && (
         <SandboxPaymentModal
           bookingId={paymentBooking.booking_id}
-          amount={Number(paymentBooking.total_amount)}
+          amount={
+            paymentBooking.payment_method === 'cash_advance'
+              ? Number(paymentBooking.advance_amount || Math.ceil(paymentBooking.total_amount * 0.20))
+              : Number(paymentBooking.total_amount)
+          }
+          purpose={paymentBooking.payment_method === 'cash_advance' ? 'advance' : 'full'}
+          balanceAmount={
+            paymentBooking.payment_method === 'cash_advance'
+              ? Number(paymentBooking.cash_balance || (paymentBooking.total_amount - Math.ceil(paymentBooking.total_amount * 0.20)))
+              : 0
+          }
           title={`Booking #${String(paymentBooking.booking_id).padStart(6, '0')} · ${
             paymentBooking.slots?.[0]?.turf_name || 'Match Booking'
           }`}

@@ -22,13 +22,17 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS organizers (
   user_id INTEGER PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
   trade_licence VARCHAR(100),
-  payout_account VARCHAR(150)
+  payout_account VARCHAR(150),
+  approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+  rejection_reason TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sellers (
   user_id INTEGER PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
   shop_name VARCHAR(150) NOT NULL,
-  payout_account VARCHAR(150)
+  payout_account VARCHAR(150),
+  approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+  rejection_reason TEXT
 );
 
 CREATE TABLE IF NOT EXISTS customers (
@@ -55,6 +59,8 @@ CREATE TABLE IF NOT EXISTS turfs (
   longitude DECIMAL(9, 6),
   rating NUMERIC(3, 2),
   description TEXT,
+  approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+  rejection_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -107,8 +113,11 @@ CREATE TABLE IF NOT EXISTS slots (
 CREATE TABLE IF NOT EXISTS bookings (
   booking_id SERIAL PRIMARY KEY,
   customer_id INTEGER NOT NULL REFERENCES customers(user_id) ON DELETE CASCADE,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'advance_paid', 'confirmed', 'completed', 'cancelled')),
   total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
+  payment_method VARCHAR(30) NOT NULL DEFAULT 'online',
+  advance_amount NUMERIC(10, 2) DEFAULT 0.00,
+  cash_balance NUMERIC(10, 2) DEFAULT 0.00,
   cancel_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -140,6 +149,8 @@ CREATE TABLE IF NOT EXISTS products (
   condition VARCHAR(20) NOT NULL DEFAULT 'new' CHECK (condition IN ('new', 'used')),
   stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
   description TEXT,
+  approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+  rejection_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -154,7 +165,10 @@ CREATE TABLE IF NOT EXISTS orders (
   order_id SERIAL PRIMARY KEY,
   customer_id INTEGER NOT NULL REFERENCES customers(user_id) ON DELETE CASCADE,
   total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
-  status VARCHAR(20) NOT NULL DEFAULT 'placed' CHECK (status IN ('placed', 'confirmed', 'shipped', 'delivered', 'cancelled')),
+  status VARCHAR(20) NOT NULL DEFAULT 'placed' CHECK (status IN ('placed', 'advance_paid', 'confirmed', 'shipped', 'delivered', 'cancelled')),
+  payment_method VARCHAR(30) NOT NULL DEFAULT 'online',
+  advance_amount NUMERIC(10, 2) DEFAULT 0.00,
+  cash_balance NUMERIC(10, 2) DEFAULT 0.00,
   delivery_address TEXT NOT NULL,
   delivery_phone VARCHAR(30),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -162,7 +176,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_id INTEGER NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
-  product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE RESTRICT,
+  product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
   qty INTEGER NOT NULL CHECK (qty > 0),
   unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
   status VARCHAR(20) NOT NULL DEFAULT 'placed',
@@ -187,6 +201,7 @@ CREATE TABLE IF NOT EXISTS payments (
   method VARCHAR(50) NOT NULL DEFAULT 'card',
   status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
   purpose VARCHAR(50) NOT NULL DEFAULT 'full',
+  is_advance BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT chk_payment_settles_one_target CHECK (
     (booking_id IS NOT NULL AND order_id IS NULL) OR
@@ -197,8 +212,10 @@ CREATE TABLE IF NOT EXISTS payments (
 -- Ensure is_admin column exists on users table for existing databases
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
--- Drop old rigid index if present
+-- Drop old rigid indexes if present
 DROP INDEX IF EXISTS one_active_booking_per_slot;
+DROP INDEX IF EXISTS one_payment_per_order;
+DROP INDEX IF EXISTS one_payment_per_booking;
 
 -- -----------------------------------------------------------------------------
 -- 2. Stored Functions
@@ -321,6 +338,36 @@ AFTER INSERT OR UPDATE OF hourly_rate ON pricing_rules
 FOR EACH ROW
 EXECUTE FUNCTION fn_log_price_change();
 
+-- Trigger 3: Order status transition validation
+CREATE OR REPLACE FUNCTION fn_validate_order_status_transition()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status = 'placed' AND NEW.status NOT IN ('confirmed', 'advance_paid', 'cancelled') THEN
+    RAISE EXCEPTION 'Cannot transition order from "placed" to "%"', NEW.status;
+  END IF;
+  IF OLD.status = 'advance_paid' AND NEW.status NOT IN ('confirmed', 'shipped', 'delivered', 'cancelled') THEN
+    RAISE EXCEPTION 'Cannot transition order from "advance_paid" to "%"', NEW.status;
+  END IF;
+  IF OLD.status = 'confirmed' AND NEW.status NOT IN ('shipped', 'cancelled') THEN
+    RAISE EXCEPTION 'Cannot transition order from "confirmed" to "%"', NEW.status;
+  END IF;
+  IF OLD.status = 'shipped' AND NEW.status NOT IN ('delivered') THEN
+    RAISE EXCEPTION 'Cannot transition order from "shipped" to "%"', NEW.status;
+  END IF;
+  IF OLD.status IN ('delivered', 'cancelled') THEN
+    RAISE EXCEPTION 'Order in "%" status cannot be changed', OLD.status;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_order_status_transition ON orders;
+CREATE TRIGGER trg_order_status_transition
+BEFORE UPDATE OF status ON orders
+FOR EACH ROW
+WHEN (OLD.status IS DISTINCT FROM NEW.status)
+EXECUTE FUNCTION fn_validate_order_status_transition();
+
 -- -----------------------------------------------------------------------------
 -- 4. Stored Procedures
 -- -----------------------------------------------------------------------------
@@ -399,6 +446,7 @@ DECLARE
   v_expected_total NUMERIC(10, 2);
   v_current_status VARCHAR;
   v_target_user_id INT;
+  v_purpose VARCHAR(50);
 BEGIN
   IF (p_booking_id IS NULL AND p_order_id IS NULL) OR
      (p_booking_id IS NOT NULL AND p_order_id IS NOT NULL) THEN
@@ -408,6 +456,8 @@ BEGIN
   IF p_amount <= 0 THEN
     RAISE EXCEPTION 'Payment amount must be greater than zero';
   END IF;
+
+  v_purpose := COALESCE(p_purpose, 'full');
 
   -- Case A: Booking Settlement
   IF p_booking_id IS NOT NULL THEN
@@ -429,20 +479,47 @@ BEGIN
       RAISE EXCEPTION 'Cannot settle payment for a cancelled booking';
     END IF;
 
-    IF v_current_status = 'confirmed' THEN
+    IF v_current_status = 'confirmed' AND v_purpose <> 'balance' THEN
       RAISE EXCEPTION 'Booking #% is already paid and confirmed', p_booking_id;
     END IF;
 
-    -- Enforce amount check server-side
-    IF p_amount < v_expected_total THEN
-      RAISE EXCEPTION 'Insufficient payment: required %, provided %', v_expected_total, p_amount;
+    IF v_purpose = 'full' THEN
+      IF p_amount < v_expected_total THEN
+        RAISE EXCEPTION 'Insufficient payment: required %, provided %', v_expected_total, p_amount;
+      END IF;
+
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (p_booking_id, NULL, p_amount, COALESCE(p_method, 'card'), 'completed', 'full', FALSE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE bookings 
+      SET status = 'confirmed', payment_method = 'online', advance_amount = p_amount, cash_balance = 0.00 
+      WHERE booking_id = p_booking_id;
+
+    ELSIF v_purpose = 'advance' THEN
+      IF p_amount >= v_expected_total THEN
+        RAISE EXCEPTION 'Advance payment amount must be less than total amount';
+      END IF;
+
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (p_booking_id, NULL, p_amount, COALESCE(p_method, 'card'), 'completed', 'advance', TRUE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE bookings 
+      SET status = 'advance_paid', payment_method = 'cash_advance', advance_amount = p_amount, cash_balance = (v_expected_total - p_amount)
+      WHERE booking_id = p_booking_id;
+
+    ELSIF v_purpose = 'balance' THEN
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (p_booking_id, NULL, p_amount, COALESCE(p_method, 'cash'), 'completed', 'balance', FALSE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE bookings 
+      SET status = 'confirmed', cash_balance = 0.00 
+      WHERE booking_id = p_booking_id;
+    ELSE
+      RAISE EXCEPTION 'Invalid payment purpose: %', v_purpose;
     END IF;
-
-    INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, created_at)
-    VALUES (p_booking_id, NULL, p_amount, COALESCE(p_method, 'card'), 'completed', COALESCE(p_purpose, 'full'), NOW())
-    RETURNING payment_id INTO p_payment_id;
-
-    UPDATE bookings SET status = 'confirmed' WHERE booking_id = p_booking_id;
 
   -- Case B: Order Settlement
   ELSE
@@ -464,16 +541,81 @@ BEGIN
       RAISE EXCEPTION 'Cannot settle payment for a cancelled order';
     END IF;
 
-    IF p_amount < v_expected_total THEN
-      RAISE EXCEPTION 'Insufficient payment: required %, provided %', v_expected_total, p_amount;
+    IF v_purpose = 'full' THEN
+      IF p_amount < v_expected_total THEN
+        RAISE EXCEPTION 'Insufficient payment: required %, provided %', v_expected_total, p_amount;
+      END IF;
+
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (NULL, p_order_id, p_amount, COALESCE(p_method, 'card'), 'completed', 'full', FALSE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE orders 
+      SET status = 'confirmed', payment_method = 'online', advance_amount = p_amount, cash_balance = 0.00 
+      WHERE order_id = p_order_id;
+
+    ELSIF v_purpose = 'advance' THEN
+      IF p_amount >= v_expected_total THEN
+        RAISE EXCEPTION 'Advance payment amount must be less than total amount';
+      END IF;
+
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (NULL, p_order_id, p_amount, COALESCE(p_method, 'card'), 'completed', 'advance', TRUE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE orders 
+      SET status = 'advance_paid', payment_method = 'cash_advance', advance_amount = p_amount, cash_balance = (v_expected_total - p_amount)
+      WHERE order_id = p_order_id;
+
+    ELSIF v_purpose = 'balance' THEN
+      INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, is_advance, created_at)
+      VALUES (NULL, p_order_id, p_amount, COALESCE(p_method, 'cash'), 'completed', 'balance', FALSE, NOW())
+      RETURNING payment_id INTO p_payment_id;
+
+      UPDATE orders 
+      SET status = 'delivered', cash_balance = 0.00 
+      WHERE order_id = p_order_id;
+    ELSE
+      RAISE EXCEPTION 'Invalid payment purpose: %', v_purpose;
     END IF;
-
-    INSERT INTO payments (booking_id, order_id, amount, method, status, purpose, created_at)
-    VALUES (NULL, p_order_id, p_amount, COALESCE(p_method, 'card'), 'completed', COALESCE(p_purpose, 'full'), NOW())
-    RETURNING payment_id INTO p_payment_id;
-
-    UPDATE orders SET status = 'confirmed' WHERE order_id = p_order_id;
   END IF;
 END;
-
 $$ LANGUAGE plpgsql;
+
+-- -----------------------------------------------------------------------------
+-- 7. Platform Operational Settings
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS platform_settings (
+  setting_key VARCHAR(50) PRIMARY KEY,
+  setting_value TEXT NOT NULL,
+  description TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO platform_settings (setting_key, setting_value, description)
+VALUES
+  ('commission_rate', '8', 'Platform commission percentage charged to organizers and sellers on gross transactions'),
+  ('advance_percentage', '20', 'Mandatory advance payment percentage for Cash at Venue pitch reservations and Cash on Delivery orders'),
+  ('broadcast_enabled', 'false', 'Global broadcast banner display across the web platform'),
+  ('broadcast_message', 'Welcome to MatchFix! Book top football arenas across Dhaka and shop authentic gear with fast delivery.', 'Broadcast announcement message shown to platform users'),
+  ('broadcast_type', 'info', 'Broadcast banner severity style: info, warning, success, alert'),
+  ('maintenance_mode', 'false', 'Flag indicating scheduled platform maintenance mode'),
+  ('support_phone', '+880 1700-000000', 'Official MatchFix support helpline phone number'),
+  ('support_email', 'support@matchfix.dev', 'Official MatchFix support email address')
+ON CONFLICT (setting_key) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  reset_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  token VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_wishlist (
+  wishlist_id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, product_id)
+);

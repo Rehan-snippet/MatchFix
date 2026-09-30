@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Star, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function TurfCard({
   turf,
@@ -15,11 +16,13 @@ export default function TurfCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Collect image array, falling back to cover_image or placeholder
-  const images = Array.isArray(turf.images) && turf.images.length > 0
-    ? turf.images
+  const rawList = Array.isArray(turf.images) && turf.images.length > 0
+    ? turf.images.map((img) => (typeof img === 'string' ? img : img?.url))
     : turf.cover_image
     ? [turf.cover_image]
     : ['https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80'];
+
+  const images = rawList.filter(Boolean).map((u) => getImageUrl(u));
 
   function handlePrevImage(e) {
     e.preventDefault();
@@ -39,9 +42,10 @@ export default function TurfCard({
     if (onToggleFavorite) onToggleFavorite(turf.turf_id);
   }
 
-  // Derive rating (deterministic or from reviews)
-  const rating = turf.rating || (4.75 + ((turf.turf_id * 7) % 25) / 100).toFixed(2);
-  const reviewCount = turf.review_count || 12 + ((turf.turf_id * 13) % 40);
+  // Dynamic rating and review count from database
+  const numericRating = Number(turf.average_rating || turf.rating || 0);
+  const reviewCount = Number(turf.review_count || 0);
+  const isGuestFavorite = numericRating >= 4.7 && reviewCount >= 3;
 
   // Derive price
   const baseRate = parseFloat(turf.hourly_rate || 1200);
@@ -73,8 +77,8 @@ export default function TurfCard({
             loading="lazy"
           />
 
-          {/* Guest Favorite Badge */}
-          {(turf.turf_id % 2 === 1 || turf.turf_id === 1) && (
+          {/* Guest Favorite Badge - Dynamic based on verified ratings */}
+          {isGuestFavorite && (
             <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-neutral-900 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5 border border-neutral-200/80">
               <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
               <span>Guest favorite</span>
@@ -140,9 +144,15 @@ export default function TurfCard({
           <div className="flex items-center justify-between text-[15px] font-semibold text-neutral-900 leading-snug">
             <span className="truncate">Turf in {turf.area_name || 'Dhaka'}, Bangladesh</span>
             <div className="flex items-center gap-1 flex-shrink-0 text-sm font-semibold">
-              <Star className="w-3.5 h-3.5 fill-neutral-900 stroke-neutral-900" />
-              <span>{rating}</span>
-              <span className="text-neutral-500 font-normal">({reviewCount})</span>
+              <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400 text-amber-500" />
+              {numericRating > 0 ? (
+                <>
+                  <span>{numericRating.toFixed(1)}</span>
+                  {reviewCount > 0 && <span className="text-neutral-500 font-normal">({reviewCount})</span>}
+                </>
+              ) : (
+                <span className="text-xs text-neutral-500 font-medium">New</span>
+              )}
             </div>
           </div>
 

@@ -180,8 +180,20 @@ export default function Profile() {
                   <Trophy className="w-4 h-4 text-[#16a34a]" />
                   <h4 className="font-bold text-sm text-neutral-900">Turf Host & Organizer</h4>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-green-50 text-[#16a34a] text-[10px] font-bold">
-                  Active
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    user.organizer.approval_status === 'approved'
+                      ? 'bg-green-50 text-[#16a34a] border border-green-200'
+                      : user.organizer.approval_status === 'rejected'
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}
+                >
+                  {user.organizer.approval_status === 'approved'
+                    ? 'Active'
+                    : user.organizer.approval_status === 'rejected'
+                    ? 'Rejected'
+                    : 'Pending Approval'}
                 </span>
               </div>
               <div className="text-xs text-neutral-600 space-y-1">
@@ -209,8 +221,20 @@ export default function Profile() {
                   <Store className="w-4 h-4 text-[#16a34a]" />
                   <h4 className="font-bold text-sm text-neutral-900">Gear Merchant</h4>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-green-50 text-[#16a34a] text-[10px] font-bold">
-                  Active
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    user.seller.approval_status === 'approved'
+                      ? 'bg-green-50 text-[#16a34a] border border-green-200'
+                      : user.seller.approval_status === 'rejected'
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}
+                >
+                  {user.seller.approval_status === 'approved'
+                    ? 'Active'
+                    : user.seller.approval_status === 'rejected'
+                    ? 'Rejected'
+                    : 'Pending Approval'}
                 </span>
               </div>
               <div className="text-xs text-neutral-600 space-y-1">

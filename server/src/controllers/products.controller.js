@@ -6,7 +6,7 @@ const db = require('../config/db');
  * GET /api/products
  */
 async function listProducts(req, res) {
-  const { category, condition, min_price, max_price, search } = req.query;
+  const { category, condition, min_price, max_price, search, seller_id, status, page = 1, limit = 100 } = req.query;
 
   try {
     let queryText = `
@@ -18,6 +18,8 @@ async function listProducts(req, res) {
         p.condition,
         p.stock,
         p.description,
+        p.approval_status,
+        p.rejection_reason,
         p.created_at,
         s.shop_name,
         u.name AS seller_name,
@@ -25,6 +27,11 @@ async function listProducts(req, res) {
           (SELECT ROUND(AVG(pr.rating)::NUMERIC, 2) FROM product_reviews pr WHERE pr.product_id = p.product_id),
           NULL
         ) AS average_rating,
+        COALESCE(
+          (SELECT ROUND(AVG(pr.rating)::NUMERIC, 2) FROM product_reviews pr WHERE pr.product_id = p.product_id),
+          NULL
+        ) AS avg_rating,
+        (SELECT COUNT(*)::INT FROM product_reviews pr WHERE pr.product_id = p.product_id) AS review_count,
         (
           SELECT pi.url FROM product_images pi
           WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE
@@ -57,8 +64,27 @@ async function listProducts(req, res) {
       params.push(`%${search}%`);
       queryText += ` AND (p.title ILIKE $${params.length} OR p.description ILIKE $${params.length})`;
     }
+    if (seller_id) {
+      params.push(seller_id);
+      queryText += ` AND p.seller_id = $${params.length}`;
+    }
+    if (status) {
+      params.push(status);
+      queryText += ` AND p.approval_status = $${params.length}`;
+    } else if (!seller_id) {
+      queryText += ` AND p.approval_status = 'approved'`;
+    }
 
     queryText += ` ORDER BY p.created_at DESC`;
+
+    const limitVal = parseInt(limit, 10);
+    const offsetVal = (parseInt(page, 10) - 1) * limitVal;
+    
+    params.push(limitVal);
+    queryText += ` LIMIT $${params.length}`;
+    
+    params.push(offsetVal);
+    queryText += ` OFFSET $${params.length}`;
 
     const { rows } = await db.query(queryText, params);
     return res.json(rows);
@@ -79,6 +105,15 @@ async function getProduct(req, res) {
         p.*,
         s.shop_name,
         u.name AS seller_name,
+        COALESCE(
+          (SELECT ROUND(AVG(pr.rating)::NUMERIC, 2) FROM product_reviews pr WHERE pr.product_id = p.product_id),
+          NULL
+        ) AS average_rating,
+        COALESCE(
+          (SELECT ROUND(AVG(pr.rating)::NUMERIC, 2) FROM product_reviews pr WHERE pr.product_id = p.product_id),
+          NULL
+        ) AS avg_rating,
+        (SELECT COUNT(*)::INT FROM product_reviews pr WHERE pr.product_id = p.product_id) AS review_count,
         (
           SELECT json_agg(json_build_object('image_id', pi.image_id, 'url', pi.url, 'is_cover', pi.is_cover))
           FROM product_images pi WHERE pi.product_id = p.product_id
@@ -127,8 +162,8 @@ async function createProduct(req, res) {
       if (!checkSeller.rows.length) throw new Error('User does not have a verified Seller account.');
 
       const { rows } = await client.query(
-        `INSERT INTO products (seller_id, title, price, category, condition, stock, description)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO products (seller_id, title, price, category, condition, stock, description, approval_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
          RETURNING *`,
         [req.user.user_id, title, price, category, condition, stock, description || null]
       );

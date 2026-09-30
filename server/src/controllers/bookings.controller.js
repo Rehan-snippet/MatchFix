@@ -5,10 +5,12 @@ const db = require('../config/db');
  * DML 20: Uses withTransaction to execute procedure sp_create_booking.
  */
 async function createBooking(req, res) {
-  const { slots } = req.body;
+  const { slots, payment_method } = req.body;
   if (!Array.isArray(slots) || slots.length === 0) {
     return res.status(400).json({ error: 'Please provide at least one slot in slots array.' });
   }
+
+  const method = payment_method === 'cash_advance' ? 'cash_advance' : 'online';
 
   try {
     const booking = await db.withTransaction(async (client) => {
@@ -17,10 +19,31 @@ async function createBooking(req, res) {
         [req.user.user_id, JSON.stringify(slots)]
       );
 
+      const bookingId = result.rows[0]?.p_booking_id;
+      const totalAmount = Number(result.rows[0]?.p_total_amount);
+      let advanceAmount = 0.00;
+      let cashBalance = 0.00;
+
+      if (method === 'cash_advance') {
+        const settingRes = await client.query(
+          "SELECT setting_value FROM platform_settings WHERE setting_key = 'advance_percentage'"
+        );
+        const advPct = parseFloat(settingRes.rows[0]?.setting_value) || 20;
+        advanceAmount = Math.ceil(totalAmount * (advPct / 100));
+        cashBalance = totalAmount - advanceAmount;
+        await client.query(
+          'UPDATE bookings SET payment_method = $1, advance_amount = $2, cash_balance = $3 WHERE booking_id = $4',
+          ['cash_advance', advanceAmount, cashBalance, bookingId]
+        );
+      }
+
       return {
-        booking_id: result.rows[0]?.p_booking_id,
-        total_amount: result.rows[0]?.p_total_amount,
+        booking_id: bookingId,
+        total_amount: totalAmount,
+        advance_amount: advanceAmount,
+        cash_balance: cashBalance,
         status: 'pending',
+        payment_method: method,
       };
     });
 
@@ -46,6 +69,9 @@ async function listMyBookings(req, res) {
         b.booking_id,
         b.status,
         b.total_amount,
+        b.payment_method,
+        b.advance_amount,
+        b.cash_balance,
         b.created_at,
         COALESCE(
           json_agg(
@@ -66,6 +92,8 @@ async function listMyBookings(req, res) {
               'payment_id', p.payment_id,
               'amount', p.amount,
               'status', p.status,
+              'purpose', p.purpose,
+              'is_advance', p.is_advance,
               'created_at', p.created_at
             )
           ) FROM payments p WHERE p.booking_id = b.booking_id
@@ -96,6 +124,9 @@ async function listBookingsForMyTurfs(req, res) {
         b.booking_id,
         b.status,
         b.total_amount,
+        b.payment_method,
+        b.advance_amount,
+        b.cash_balance,
         b.created_at,
         u.name AS customer_name,
         u.email AS customer_email,
@@ -117,6 +148,60 @@ async function listBookingsForMyTurfs(req, res) {
     return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/bookings/:id/collect-cash
+ * Organizer collects the remaining cash balance at the venue
+ */
+async function collectBookingCash(req, res) {
+  const { id } = req.params;
+
+  try {
+    const updatedBooking = await db.withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `SELECT b.booking_id, b.customer_id, b.total_amount, b.status, b.cash_balance, t.organizer_id
+         FROM bookings b
+         JOIN booking_slots bs ON b.booking_id = bs.booking_id
+         JOIN fields f ON bs.field_id = f.field_id
+         JOIN turfs t ON f.turf_id = t.turf_id
+         WHERE b.booking_id = $1 FOR UPDATE`,
+        [id]
+      );
+
+      if (!rows.length) throw new Error('Booking not found.');
+      const b = rows[0];
+
+      if (!req.user.is_admin && b.organizer_id !== req.user.user_id) {
+        throw new Error('Unauthorized: Organizer access required.');
+      }
+
+      if (b.status !== 'advance_paid') {
+        throw new Error(`Cannot collect cash for booking with status "${b.status}". Status must be "advance_paid".`);
+      }
+
+      const cashAmount = Number(b.cash_balance);
+      if (cashAmount <= 0) {
+        throw new Error('No cash balance remaining on this booking.');
+      }
+
+      // Settle remaining cash balance via stored procedure
+      await client.query(
+        'CALL sp_record_payment($1, $2, NULL, $3, $4, $5, NULL)',
+        [b.customer_id, b.booking_id, cashAmount, 'cash', 'balance']
+      );
+
+      const { rows: resRows } = await client.query('SELECT * FROM bookings WHERE booking_id = $1', [id]);
+      return resRows[0];
+    });
+
+    return res.json({
+      message: 'Cash payment collected successfully. Booking is now confirmed.',
+      booking: updatedBooking,
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 }
 
@@ -232,5 +317,6 @@ module.exports = {
   listBookingsForMyTurfs,
   cancelBooking,
   confirmBooking,
+  collectBookingCash,
   addTurfReview,
 };

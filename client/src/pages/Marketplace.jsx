@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
-import { Search, ShoppingBag, Star, Sparkles, Store, CheckCircle2, SlidersHorizontal, Tag } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { Search, ShoppingBag, ShoppingCart, Plus, Star, Sparkles, Store, CheckCircle2, SlidersHorizontal, Tag, Heart } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 const CATEGORIES = [
   'All Items',
@@ -14,16 +17,55 @@ const CATEGORIES = [
 ];
 
 export default function Marketplace() {
+  const { addToCart } = useCart();
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('All Items');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [wishlist, setWishlist] = useState(new Set());
 
   useEffect(() => {
+    if (user) {
+      api.get('/users/me/wishlist')
+        .then(res => {
+          setWishlist(new Set(res.data.map(item => item.product_id)));
+        })
+        .catch(console.error);
+    } else {
+      setWishlist(new Set());
+    }
+  }, [user]);
+
+  const observer = useRef();
+  const lastElementRef = useCallback(node => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prev => prev + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore]);
+
+  // Reset page on search or category change
+  useEffect(() => {
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+  }, [q, category]);
+
+  useEffect(() => {
+    if (!hasMore) return;
     setLoading(true);
     const timeout = setTimeout(() => {
+      const params = { page, limit: 10 };
+      if (q) params.q = q;
       api
-        .get('/products', { params: q ? { q } : {} })
+        .get('/products', { params })
         .then((res) => {
           let list = res.data || [];
           if (category !== 'All Items') {
@@ -32,12 +74,36 @@ export default function Marketplace() {
               p.title?.toLowerCase().includes(category.toLowerCase())
             );
           }
-          setProducts(list);
+          if (res.data.length < 10) setHasMore(false);
+          setProducts((prev) => [...prev, ...list]);
         })
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timeout);
-  }, [q, category]);
+  }, [q, category, page]);
+
+  function toggleWishlist(e, productId) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      alert('Please log in to add items to your wishlist.');
+      return;
+    }
+
+    const isWished = wishlist.has(productId);
+    const apiCall = isWished 
+      ? api.delete(`/users/me/wishlist/${productId}`)
+      : api.post(`/users/me/wishlist/${productId}`);
+
+    apiCall.then(() => {
+      setWishlist(prev => {
+        const next = new Set(prev);
+        if (isWished) next.delete(productId);
+        else next.add(productId);
+        return next;
+      });
+    }).catch(console.error);
+  }
 
   return (
     <div className="w-full bg-white pb-20">
@@ -132,8 +198,9 @@ export default function Marketplace() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {products.map((p) => (
+            {products.map((p, index) => (
               <Link
+                ref={products.length === index + 1 ? lastElementRef : null}
                 to={`/marketplace/${p.product_id}`}
                 key={p.product_id}
                 className="group flex flex-col cursor-pointer"
@@ -141,7 +208,7 @@ export default function Marketplace() {
                 {/* Image Container with Airbnb Rounded Borders */}
                 <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-neutral-100 border border-neutral-200/80 mb-3 shadow-2xs group-hover:shadow-md transition duration-200">
                   <img
-                    src={p.cover_image || 'https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=800&q=80'}
+                    src={getImageUrl(p.cover_image, 'https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=800&q=80')}
                     alt={p.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300 ease-out"
                     loading="lazy"
@@ -152,6 +219,14 @@ export default function Marketplace() {
                       {p.condition || 'New'}
                     </span>
                   </div>
+
+                  {/* Wishlist Button */}
+                  <button
+                    onClick={(e) => toggleWishlist(e, p.product_id)}
+                    className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur hover:bg-white text-neutral-600 hover:scale-110 active:scale-95 transition"
+                  >
+                    <Heart className={`w-4 h-4 ${wishlist.has(p.product_id) ? 'fill-rose-500 text-rose-500' : 'text-neutral-700'}`} />
+                  </button>
 
                   {/* Stock Status Badge */}
                   <div className="absolute bottom-3 left-3">
@@ -171,11 +246,13 @@ export default function Marketplace() {
                     <h3 className="font-bold text-sm text-neutral-900 truncate group-hover:text-[#16a34a] transition">
                       {p.title}
                     </h3>
-                    {p.avg_rating && (
+                    {Number(p.avg_rating || p.average_rating) > 0 ? (
                       <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800 flex-shrink-0">
                         <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                        <span>{p.avg_rating}</span>
+                        <span>{Number(p.avg_rating || p.average_rating).toFixed(1)}</span>
                       </div>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-neutral-400 flex-shrink-0">New</span>
                     )}
                   </div>
 
@@ -184,15 +261,38 @@ export default function Marketplace() {
                     <span className="truncate">{p.shop_name}</span>
                   </p>
 
-                  <div className="pt-1 flex items-baseline gap-1.5">
-                    <span className="text-sm font-extrabold text-neutral-900">
-                      ৳{Number(p.price).toLocaleString()}
-                    </span>
-                    <span className="text-[11px] text-neutral-500">VAT inc.</span>
+                  <div className="pt-1 flex items-center justify-between gap-1.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-extrabold text-neutral-900">
+                        ৳{Number(p.price).toLocaleString()}
+                      </span>
+                      <span className="text-[11px] text-neutral-500">VAT inc.</span>
+                    </div>
+
+                    {p.stock > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          addToCart(p, 1);
+                        }}
+                        title="Add to cart"
+                        className="w-7 h-7 rounded-full bg-neutral-100 hover:bg-[#16a34a] text-neutral-700 hover:text-white transition shadow-2xs flex items-center justify-center cursor-pointer active:scale-90"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+        
+        {loading && page > 1 && (
+          <div className="py-6 text-center text-neutral-500 font-semibold animate-pulse">
+            Loading more items...
           </div>
         )}
       </div>

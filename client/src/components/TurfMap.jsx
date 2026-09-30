@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import { Maximize2, RotateCcw, Plus, Minus } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 // Clean OpenStreetMap tile layer (100% free, zero watermark, no API key required)
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -88,8 +89,10 @@ export default function TurfMap({
       const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
       // Popup mini-card (Airbnb style)
-      const cover = t.cover_image || (t.images && t.images[0]) || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400';
-      const rating = t.rating || (4.75 + ((t.turf_id * 7) % 25) / 100).toFixed(2);
+      const rawCover = t.cover_image || (t.images && (typeof t.images[0] === 'string' ? t.images[0] : t.images[0]?.url)) || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400';
+      const cover = getImageUrl(rawCover, 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400');
+      const numRating = Number(t.average_rating || t.rating || 0);
+      const ratingText = numRating > 0 ? `★ ${numRating.toFixed(1)}` : '★ New';
       const popupHtml = `
         <div style="width: 220px; font-family: inherit;">
           <div style="width: 100%; height: 130px; border-radius: 12px 12px 0 0; overflow: hidden; position: relative;">
@@ -103,7 +106,7 @@ export default function TurfMap({
               <span style="font-weight: 700; font-size: 13px; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">
                 ${t.name}
               </span>
-              <span style="font-size: 12px; font-weight: 600; color: #111;">★ ${rating}</span>
+              <span style="font-size: 12px; font-weight: 600; color: #111;">${ratingText}</span>
             </div>
             <div style="font-size: 11px; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${t.address || ''}

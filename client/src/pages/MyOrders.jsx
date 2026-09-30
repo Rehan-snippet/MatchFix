@@ -117,15 +117,41 @@ export default function MyOrders() {
             >
               {/* Order Top Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-neutral-100">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-bold text-neutral-500">
-                    Order #{String(o.order_id).padStart(6, '0')}
-                  </span>
-                  <span className="text-xs text-neutral-400">·</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-neutral-500">
+                      Order #{String(o.order_id).padStart(6, '0')}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      o.status === 'delivered'
+                        ? 'bg-green-50 text-[#16a34a] border border-green-200'
+                        : o.status === 'shipped'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : o.status === 'advance_paid'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                        : o.status === 'cancelled'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-neutral-50 text-neutral-700 border border-neutral-200'
+                    }`}>
+                      {o.status === 'advance_paid' ? 'Advance Paid (COD)' : o.status}
+                    </span>
+                    {o.payment_method === 'cash_advance' && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-200">
+                        Cash on Delivery
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 text-xs text-neutral-600">
                     <MapPin className="w-3.5 h-3.5 text-neutral-400" />
                     <span>{o.delivery_address}</span>
                   </div>
+                  {o.payment_method === 'cash_advance' && (
+                    <div className="text-xs text-amber-800">
+                      <span>Advance: ৳{Number(o.advance_amount || 0).toLocaleString()}</span>
+                      <span className="mx-1.5">·</span>
+                      <span className="font-bold">Due on delivery: ৳{Number(o.cash_balance || 0).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -136,7 +162,11 @@ export default function MyOrders() {
                     </span>
                   </div>
 
-                  {o.payments?.length ? (
+                  {o.status === 'advance_paid' ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300">
+                      Advance Paid
+                    </span>
+                  ) : o.payments?.length || o.status === 'delivered' || o.status === 'confirmed' || o.status === 'shipped' ? (
                     <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-50 text-[#16a34a] border border-green-200">
                       Paid
                     </span>
@@ -147,7 +177,7 @@ export default function MyOrders() {
                       className="px-4 py-2 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
                     >
                       <CreditCard className="w-3.5 h-3.5" />
-                      <span>Pay Now</span>
+                      <span>{o.payment_method === 'cash_advance' ? 'Pay Advance' : 'Pay Now'}</span>
                     </button>
                   )}
                 </div>
@@ -304,7 +334,17 @@ export default function MyOrders() {
       {paymentOrder && (
         <SandboxPaymentModal
           orderId={paymentOrder.order_id}
-          amount={Number(paymentOrder.total_amount || paymentOrder.total || 0)}
+          amount={
+            paymentOrder.payment_method === 'cash_advance'
+              ? Number(paymentOrder.advance_amount || Math.ceil((paymentOrder.total_amount || paymentOrder.total || 0) * 0.20))
+              : Number(paymentOrder.total_amount || paymentOrder.total || 0)
+          }
+          purpose={paymentOrder.payment_method === 'cash_advance' ? 'advance' : 'full'}
+          balanceAmount={
+            paymentOrder.payment_method === 'cash_advance'
+              ? Number(paymentOrder.cash_balance || ((paymentOrder.total_amount || paymentOrder.total || 0) - Math.ceil((paymentOrder.total_amount || paymentOrder.total || 0) * 0.20)))
+              : 0
+          }
           title={`Order #${String(paymentOrder.order_id).padStart(6, '0')} Checkout`}
           onSuccess={() => {
             setPaymentOrder(null);

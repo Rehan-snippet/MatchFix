@@ -18,6 +18,7 @@ import {
   AlertCircle,
   HelpCircle,
 } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 function todayISO() {
   const d = new Date();
@@ -42,6 +43,7 @@ export default function TurfDetail() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const [paymentBooking, setPaymentBooking] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('online'); // 'online' | 'cash_advance'
 
   const miniMapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -149,9 +151,14 @@ export default function TurfDetail() {
           start_time: s.start_time,
           end_time: s.end_time,
         })),
+        payment_method: paymentMethod,
       });
       setIsSuccess(true);
-      setMessage('Match booking created! Opening sandbox checkout...');
+      setMessage(
+        paymentMethod === 'cash_advance'
+          ? 'Match reservation created with Cash at Venue! Opening 20% advance payment checkout...'
+          : 'Match booking created! Opening sandbox checkout...'
+      );
       setSelected([]);
       const res = await api.get('/slots', { params: { field_id: fieldId, date } });
       setSlots(res.data);
@@ -177,7 +184,7 @@ export default function TurfDetail() {
 
   // Collect photos
   const rawImages = turf.images?.length
-    ? turf.images.map((img) => (typeof img === 'string' ? img : img.url))
+    ? turf.images.map((img) => getImageUrl(typeof img === 'string' ? img : img?.url))
     : [
         'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
         'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80',
@@ -193,8 +200,12 @@ export default function TurfDetail() {
   // Calculation breakdown
   const slotsCount = selected.length;
   const subtotal = slotsCount * hourlyRate;
-  const serviceFee = slotsCount > 0 ? Math.round(subtotal * 0.05) : 0;
-  const grandTotal = subtotal + serviceFee;
+  const includedVat = slotsCount > 0 ? Math.round(subtotal * 5 / 105) : 0;
+  const grandTotal = subtotal;
+
+  const numAverageRating = Number(turf.average_rating || 0);
+  const reviewsCount = turf.reviews?.length || 0;
+  const isGuestFavorite = numAverageRating >= 4.7 && reviewsCount >= 3;
 
   return (
     <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -207,16 +218,20 @@ export default function TurfDetail() {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 font-bold text-neutral-900">
               <Star className="w-4 h-4 fill-amber-400 stroke-amber-400" />
-              <span>{turf.average_rating ? Number(turf.average_rating).toFixed(2) : '5.00'}</span>
+              <span>{numAverageRating > 0 ? numAverageRating.toFixed(2) : 'New'}</span>
             </span>
             <span>·</span>
             <a href="#reviews" className="underline font-semibold cursor-pointer text-neutral-800 hover:text-black">
-              {turf.reviews?.length || 0} {turf.reviews?.length === 1 ? 'review' : 'reviews'}
+              {reviewsCount} {reviewsCount === 1 ? 'review' : 'reviews'}
             </a>
-            <span>·</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs">
-              Guest favorite
-            </span>
+            {isGuestFavorite && (
+              <>
+                <span>·</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs">
+                  Guest favorite
+                </span>
+              </>
+            )}
             <span>·</span>
             <span className="underline font-medium">
               {turf.area_name}, Dhaka, Bangladesh
@@ -408,9 +423,9 @@ export default function TurfDetail() {
                 <span className="text-sm text-neutral-500 font-medium">/ hour</span>
               </div>
               <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800">
-                <Star className="w-3.5 h-3.5 fill-neutral-900 stroke-neutral-900" />
-                <span>4.92</span>
-                <span className="text-neutral-400 font-normal">(28)</span>
+                <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400 text-amber-500" />
+                <span>{numAverageRating > 0 ? numAverageRating.toFixed(2) : 'New'}</span>
+                {reviewsCount > 0 && <span className="text-neutral-400 font-normal">({reviewsCount})</span>}
               </div>
             </div>
 
@@ -505,13 +520,65 @@ export default function TurfDetail() {
                   <span>৳{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-neutral-600">
-                  <span>Venue lighting & service fee (5%)</span>
-                  <span>৳{serviceFee.toLocaleString()}</span>
+                  <span>VAT & venue charges (5% included)</span>
+                  <span>৳{includedVat.toLocaleString()}</span>
                 </div>
+
+                {/* Payment Option Selector */}
+                <div className="pt-2 border-t border-neutral-100 space-y-2">
+                  <label className="block text-[10px] font-bold text-neutral-700 uppercase tracking-wider">
+                    Payment Method
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('online')}
+                      className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                        paymentMethod === 'online'
+                          ? 'border-[#16a34a] bg-green-50/70 ring-1 ring-[#16a34a]'
+                          : 'border-neutral-200 hover:border-neutral-300 bg-neutral-50/50'
+                      }`}
+                    >
+                      <span className="text-[11px] font-bold text-neutral-900 flex items-center gap-1">
+                        💳 Pay Full Online
+                      </span>
+                      <span className="text-[9px] text-neutral-500 mt-0.5">100% instant payment</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('cash_advance')}
+                      className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                        paymentMethod === 'cash_advance'
+                          ? 'border-[#16a34a] bg-green-50/70 ring-1 ring-[#16a34a]'
+                          : 'border-neutral-200 hover:border-neutral-300 bg-neutral-50/50'
+                      }`}
+                    >
+                      <span className="text-[11px] font-bold text-neutral-900 flex items-center gap-1">
+                        💵 Cash at Venue
+                      </span>
+                      <span className="text-[9px] text-[#16a34a] font-bold mt-0.5">20% advance online</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex justify-between text-sm font-extrabold text-neutral-900 pt-2 border-t border-neutral-200">
-                  <span>Total before taxes</span>
-                  <span>৳{grandTotal.toLocaleString()}</span>
+                  <span>Total Amount</span>
+                  <span className="text-[#16a34a]">৳{grandTotal.toLocaleString()}</span>
                 </div>
+
+                {paymentMethod === 'cash_advance' && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                    <div className="flex justify-between font-bold text-[11px]">
+                      <span>Online Advance (20%)</span>
+                      <span className="text-[#16a34a]">৳{Math.ceil(grandTotal * 0.20).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-amber-800">
+                      <span>Cash at Venue (80%)</span>
+                      <span className="font-bold">৳{(grandTotal - Math.ceil(grandTotal * 0.20)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -522,7 +589,13 @@ export default function TurfDetail() {
               disabled={busy || selected.length === 0}
               className="w-full py-3.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] disabled:bg-neutral-300 text-white font-bold text-sm shadow-md transition active:scale-[0.98] cursor-pointer"
             >
-              {busy ? 'Creating reservation…' : selected.length > 0 ? 'Reserve Pitch' : 'Select Time Slot'}
+              {busy
+                ? 'Creating reservation…'
+                : selected.length === 0
+                ? 'Select Time Slot'
+                : paymentMethod === 'cash_advance'
+                ? `Pay ৳${Math.ceil(grandTotal * 0.20).toLocaleString()} Advance & Book`
+                : 'Pay & Reserve Pitch'}
             </button>
 
             <p className="text-[11px] text-center text-neutral-500">
@@ -565,7 +638,7 @@ export default function TurfDetail() {
         <div className="flex items-center gap-3 mb-6">
           <div className="flex items-center gap-1.5 text-xl sm:text-2xl font-black text-neutral-900">
             <Star className="w-6 h-6 fill-amber-400 stroke-amber-400" />
-            <span>{turf.average_rating ? Number(turf.average_rating).toFixed(2) : '5.00'}</span>
+            <span>{numAverageRating > 0 ? numAverageRating.toFixed(2) : 'New'}</span>
           </div>
           <span className="text-xl sm:text-2xl font-black text-neutral-300">·</span>
           <h2 className="text-xl sm:text-2xl font-black text-neutral-900">
@@ -623,11 +696,25 @@ export default function TurfDetail() {
       {paymentBooking && (
         <SandboxPaymentModal
           bookingId={paymentBooking.booking_id}
-          amount={Number(paymentBooking.total_amount)}
+          amount={
+            paymentBooking.payment_method === 'cash_advance'
+              ? Math.ceil(Number(paymentBooking.total_amount) * 0.20)
+              : Number(paymentBooking.total_amount)
+          }
+          purpose={paymentBooking.payment_method === 'cash_advance' ? 'advance' : 'full'}
+          balanceAmount={
+            paymentBooking.payment_method === 'cash_advance'
+              ? Number(paymentBooking.total_amount) - Math.ceil(Number(paymentBooking.total_amount) * 0.20)
+              : 0
+          }
           title={`Booking #${String(paymentBooking.booking_id).padStart(6, '0')} · ${turf.name}`}
           onSuccess={() => {
             setPaymentBooking(null);
-            setMessage('🎉 Booking confirmed and paid successfully! View details in My Bookings.');
+            setMessage(
+              paymentBooking.payment_method === 'cash_advance'
+                ? '🎉 20% advance received! Your match slot is reserved. Pay the remaining 80% balance in cash at the venue.'
+                : '🎉 Booking confirmed and paid successfully! View details in My Bookings.'
+            );
           }}
           onClose={() => {
             setPaymentBooking(null);

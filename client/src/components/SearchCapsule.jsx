@@ -89,9 +89,26 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
             Where
           </div>
           <div className="text-sm font-medium text-neutral-600 truncate">
-            {selectedAreaObj
-              ? `${selectedAreaObj.name}`
-              : searchKeyword || "Search Dhaka destinations"}
+            {selectedAreaObj ? `${selectedAreaObj.name}` : "Search area"}
+          </div>
+        </div>
+
+        <div className="w-[1px] h-6 bg-neutral-200" />
+
+        {/* Venue / Name */}
+        <div
+          onClick={() => setActiveTab(activeTab === "venue" ? null : "venue")}
+          className={`flex-1 px-4 py-1.5 rounded-full text-left transition-colors ${
+            activeTab === "venue"
+              ? "bg-white shadow-md"
+              : "hover:bg-neutral-100/80"
+          }`}
+        >
+          <div className="text-[11px] font-bold tracking-wider text-neutral-800 uppercase">
+            Venue Name
+          </div>
+          <div className="text-sm font-medium text-neutral-600 truncate">
+            {searchKeyword ? searchKeyword : "Search by name"}
           </div>
         </div>
 
@@ -153,8 +170,8 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
         <div className="absolute top-full left-0 right-0 mt-3 p-5 bg-white rounded-3xl shadow-2xl border border-neutral-200 z-[100] animate-in fade-in zoom-in-95 duration-150">
           <div className="flex justify-between items-center pb-3 mb-4 border-b border-neutral-100">
             <h4 className="font-semibold text-neutral-900 text-sm">
-              {activeTab === "where" &&
-                "Search by Area or Neighborhood in Dhaka"}
+              {activeTab === "where" && "Search by Area or Neighborhood"}
+              {activeTab === "venue" && "Search by Venue Name"}
               {activeTab === "when" && "Select Match Date"}
               {activeTab === "format" && "Select Pitch Format & Squad Size"}
             </h4>
@@ -170,20 +187,6 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
           {activeTab === "where" && (
             <div className="space-y-4">
               <div>
-                <input
-                  type="text"
-                  placeholder="Type venue name or location (e.g., Banani, Mirpur, Greenline)"
-                  value={searchKeyword}
-                  onChange={(e) => {
-                    setSearchKeyword(e.target.value);
-                    if (selectedArea) setSelectedArea("");
-                  }}
-                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]"
-                  autoFocus
-                />
-              </div>
-
-              <div>
                 <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2">
                   Popular Dhaka Neighborhoods
                 </div>
@@ -191,11 +194,10 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
                   <button
                     onClick={() => {
                       setSelectedArea("");
-                      setSearchKeyword("");
-                      setActiveTab("when");
+                      setActiveTab("venue");
                     }}
                     className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition ${
-                      !selectedArea && !searchKeyword
+                      !selectedArea
                         ? "border-neutral-900 bg-neutral-900 text-white font-semibold"
                         : "border-neutral-200 hover:border-neutral-400 text-neutral-800"
                     }`}
@@ -204,15 +206,13 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
                     <span>All of Dhaka</span>
                   </button>
                   {areas.map((a) => {
-                    const isSelected =
-                      String(selectedArea) === String(a.area_id);
+                    const isSelected = String(selectedArea) === String(a.area_id);
                     return (
                       <button
                         key={a.area_id}
                         onClick={() => {
                           setSelectedArea(a.area_id);
-                          setSearchKeyword("");
-                          setActiveTab("when");
+                          setActiveTab("venue");
                         }}
                         className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs transition ${
                           isSelected
@@ -226,6 +226,27 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: VENUE */}
+          {activeTab === "venue" && (
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  placeholder="Type venue name (e.g., Greenline, PlayField)"
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setActiveTab("when");
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]"
+                  autoFocus
+                />
               </div>
             </div>
           )}

@@ -12,6 +12,15 @@ const PG_ERROR_MESSAGES = {
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Uploaded photo is too large. Maximum allowed size is 15MB.' });
+    }
+    return res.status(400).json({ error: err.message || 'File upload failed.' });
+  }
+  if (err.code === 'INVALID_FILE_TYPE' || err.message?.includes('Only image files')) {
+    return res.status(400).json({ error: 'Only image files (JPEG, PNG, WEBP, GIF) are allowed.' });
+  }
   if (err.code && PG_ERROR_MESSAGES[err.code]) {
     return res.status(400).json({ error: PG_ERROR_MESSAGES[err.code](err) });
   }

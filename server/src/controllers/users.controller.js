@@ -97,4 +97,34 @@ const becomeCustomer = asyncHandler(async (req, res) => {
   res.status(201).json(customer);
 });
 
-module.exports = { getMe, updateMe, becomeOrganizer, becomeSeller, becomeCustomer };
+const getWishlist = asyncHandler(async (req, res) => {
+  const { rows } = await db.query(`
+    SELECT p.*, pw.created_at as added_at,
+           (SELECT pi.url FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE LIMIT 1) AS cover_image
+    FROM product_wishlist pw
+    JOIN products p ON pw.product_id = p.product_id
+    WHERE pw.user_id = $1
+    ORDER BY pw.created_at DESC
+  `, [req.user.user_id]);
+  res.json(rows);
+});
+
+const addWishlist = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  await db.query(
+    'INSERT INTO product_wishlist (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [req.user.user_id, productId]
+  );
+  res.json({ success: true });
+});
+
+const removeWishlist = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  await db.query(
+    'DELETE FROM product_wishlist WHERE user_id = $1 AND product_id = $2',
+    [req.user.user_id, productId]
+  );
+  res.json({ success: true });
+});
+
+module.exports = { getMe, updateMe, becomeOrganizer, becomeSeller, becomeCustomer, getWishlist, addWishlist, removeWishlist };

@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/register', payload);
     localStorage.setItem('matchfix_token', data.token);
     setUser(data.user);
-    return data.user;
+    return data;
   }
 
   function logout() {

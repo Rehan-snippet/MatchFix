@@ -6,7 +6,7 @@ const db = require('../config/db');
  * and creates order + order_items atomically.
  */
 async function createOrder(req, res) {
-  const { items, delivery_address, delivery_phone } = req.body;
+  const { items, delivery_address, delivery_phone, payment_method } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Order must contain at least one item.' });
@@ -14,6 +14,8 @@ async function createOrder(req, res) {
   if (!delivery_address) {
     return res.status(400).json({ error: 'Delivery address is required.' });
   }
+
+  const method = payment_method === 'cash_advance' ? 'cash_advance' : 'online';
 
   try {
     const order = await db.withTransaction(async (client) => {
@@ -58,12 +60,23 @@ async function createOrder(req, res) {
         });
       }
 
+      let advanceAmount = 0.00;
+      let initialCashBalance = 0.00;
+      if (method === 'cash_advance') {
+        const settingRes = await client.query(
+          "SELECT setting_value FROM platform_settings WHERE setting_key = 'advance_percentage'"
+        );
+        const advPct = parseFloat(settingRes.rows[0]?.setting_value) || 20;
+        advanceAmount = Math.ceil(totalAmount * (advPct / 100));
+        initialCashBalance = totalAmount - advanceAmount;
+      }
+
       // Create Order
       const orderRes = await client.query(
-        `INSERT INTO orders (customer_id, total_amount, status, delivery_address, delivery_phone)
-         VALUES ($1, $2, 'placed', $3, $4)
+        `INSERT INTO orders (customer_id, total_amount, status, payment_method, advance_amount, cash_balance, delivery_address, delivery_phone)
+         VALUES ($1, $2, 'placed', $3, $4, $5, $6, $7)
          RETURNING *`,
-        [req.user.user_id, totalAmount, delivery_address, delivery_phone || null]
+        [req.user.user_id, totalAmount, method, advanceAmount, initialCashBalance, delivery_address, delivery_phone || null]
       );
       const createdOrder = orderRes.rows[0];
 
@@ -98,6 +111,9 @@ async function listMyOrders(req, res) {
         o.order_id,
         o.total_amount,
         o.status,
+        o.payment_method,
+        o.advance_amount,
+        o.cash_balance,
         o.delivery_address,
         o.delivery_phone,
         o.created_at,
@@ -111,7 +127,15 @@ async function listMyOrders(req, res) {
           )
         ) AS items,
         (
-          SELECT json_agg(json_build_object('payment_id', pay.payment_id, 'amount', pay.amount, 'status', pay.status))
+          SELECT json_agg(
+            json_build_object(
+              'payment_id', pay.payment_id,
+              'amount', pay.amount,
+              'status', pay.status,
+              'purpose', pay.purpose,
+              'is_advance', pay.is_advance
+            )
+          )
           FROM payments pay WHERE pay.order_id = o.order_id
         ) AS payments
       FROM orders o
@@ -138,6 +162,9 @@ async function listOrdersForMyProducts(req, res) {
       `SELECT
         o.order_id,
         o.status AS order_status,
+        o.payment_method,
+        o.advance_amount,
+        o.cash_balance,
         o.created_at,
         u.name AS customer_name,
         u.phone AS customer_phone,
@@ -159,6 +186,67 @@ async function listOrdersForMyProducts(req, res) {
     return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * PATCH /api/orders/:id/collect-cash
+ * Seller or Admin marks COD cash collected upon delivery
+ */
+async function collectOrderCash(req, res) {
+  const { id } = req.params;
+
+  try {
+    const updatedOrder = await db.withTransaction(async (client) => {
+      const { rows } = await client.query(
+        'SELECT * FROM orders WHERE order_id = $1 FOR UPDATE',
+        [id]
+      );
+
+      if (!rows.length) throw new Error('Order not found.');
+      const o = rows[0];
+
+      if (!req.user.is_admin) {
+        const sellerCheck = await client.query(
+          `SELECT p.seller_id FROM order_items oi JOIN products p ON oi.product_id = p.product_id WHERE oi.order_id = $1 AND p.seller_id = $2`,
+          [id, req.user.user_id]
+        );
+        if (!sellerCheck.rows.length) {
+          throw new Error('Unauthorized: You do not have products in this order.');
+        }
+      }
+
+      if (o.status === 'delivered') {
+        throw new Error('Order is already delivered and settled.');
+      }
+
+      const cashAmount = Number(o.cash_balance);
+      if (cashAmount <= 0) {
+        throw new Error('No cash balance remaining on this order.');
+      }
+
+      // Settle remaining cash balance via stored procedure
+      await client.query(
+        'CALL sp_record_payment($1, NULL, $2, $3, $4, $5, NULL)',
+        [o.customer_id, o.order_id, cashAmount, 'cash', 'balance']
+      );
+
+      // Mark order items delivered
+      await client.query(
+        `UPDATE order_items SET status = 'delivered' WHERE order_id = $1`,
+        [id]
+      );
+
+      const { rows: resRows } = await client.query('SELECT * FROM orders WHERE order_id = $1', [id]);
+      return resRows[0];
+    });
+
+    return res.json({
+      message: 'Cash on delivery collected successfully. Order delivered.',
+      order: updatedOrder,
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 }
 
@@ -211,7 +299,7 @@ async function updateOrderStatus(req, res) {
   const productId = req.params.productId;
   const { status } = req.body;
 
-  const validStatuses = ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+  const validStatuses = ['placed', 'advance_paid', 'confirmed', 'shipped', 'delivered', 'cancelled'];
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
   }
@@ -312,5 +400,6 @@ module.exports = {
   listOrdersForMyProducts,
   cancelOrder,
   updateOrderStatus,
+  collectOrderCash,
   addProductReview,
 };
