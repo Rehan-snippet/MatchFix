@@ -79,74 +79,74 @@ export default function AirbnbSearchCapsule({ isHero = false }) {
         {/* Destination / Where */}
         <div
           onClick={() => setActiveTab(activeTab === "where" ? null : "where")}
-          className={`flex-1 px-4 py-1.5 rounded-full text-left transition-colors ${
+          className={`flex-1 min-w-0 px-2 sm:px-4 py-1.5 rounded-full text-left transition-colors ${
             activeTab === "where"
               ? "bg-white shadow-md"
               : "hover:bg-neutral-100/80"
           }`}
         >
-          <div className="text-[11px] font-bold tracking-wider text-neutral-800 uppercase">
+          <div className="text-[10px] sm:text-[11px] font-bold tracking-wider text-neutral-800 uppercase truncate">
             Where
           </div>
-          <div className="text-sm font-medium text-neutral-600 truncate">
+          <div className="text-xs sm:text-sm font-medium text-neutral-600 truncate">
             {selectedAreaObj ? `${selectedAreaObj.name}` : "Search area"}
           </div>
         </div>
 
-        <div className="w-[1px] h-6 bg-neutral-200" />
+        <div className="w-[1px] h-6 bg-neutral-200 shrink-0" />
 
         {/* Venue / Name */}
         <div
           onClick={() => setActiveTab(activeTab === "venue" ? null : "venue")}
-          className={`flex-1 px-4 py-1.5 rounded-full text-left transition-colors ${
+          className={`flex-1 min-w-0 px-2 sm:px-4 py-1.5 rounded-full text-left transition-colors ${
             activeTab === "venue"
               ? "bg-white shadow-md"
               : "hover:bg-neutral-100/80"
           }`}
         >
-          <div className="text-[11px] font-bold tracking-wider text-neutral-800 uppercase">
+          <div className="text-[10px] sm:text-[11px] font-bold tracking-wider text-neutral-800 uppercase truncate">
             Venue Name
           </div>
-          <div className="text-sm font-medium text-neutral-600 truncate">
-            {searchKeyword ? searchKeyword : "Search by name"}
+          <div className="text-xs sm:text-sm font-medium text-neutral-600 truncate">
+            {searchKeyword ? searchKeyword : "Search name"}
           </div>
         </div>
 
-        <div className="w-[1px] h-6 bg-neutral-200" />
+        <div className="w-[1px] h-6 bg-neutral-200 shrink-0" />
 
         {/* When / Date */}
         <div
           onClick={() => setActiveTab(activeTab === "when" ? null : "when")}
-          className={`flex-1 px-4 py-1.5 rounded-full text-left transition-colors ${
+          className={`flex-1 min-w-0 px-2 sm:px-4 py-1.5 rounded-full text-left transition-colors ${
             activeTab === "when"
               ? "bg-white shadow-md"
               : "hover:bg-neutral-100/80"
           }`}
         >
-          <div className="text-[11px] font-bold tracking-wider text-neutral-800 uppercase">
+          <div className="text-[10px] sm:text-[11px] font-bold tracking-wider text-neutral-800 uppercase truncate">
             When
           </div>
-          <div className="text-sm font-medium text-neutral-600 truncate">
-            {selectedDate ? selectedDate : "Any match day"}
+          <div className="text-xs sm:text-sm font-medium text-neutral-600 truncate">
+            {selectedDate ? selectedDate : "Any date"}
           </div>
         </div>
 
-        <div className="w-[1px] h-6 bg-neutral-200" />
+        <div className="w-[1px] h-6 bg-neutral-200 shrink-0" />
 
         {/* Format / Who */}
         <div
           onClick={() => setActiveTab(activeTab === "format" ? null : "format")}
-          className={`flex-1 px-4 py-1.5 rounded-full text-left transition-colors ${
+          className={`flex-1 min-w-0 px-2 sm:px-4 py-1.5 rounded-full text-left transition-colors ${
             activeTab === "format"
               ? "bg-white shadow-md"
               : "hover:bg-neutral-100/80"
           }`}
         >
-          <div className="text-[11px] font-bold tracking-wider text-neutral-800 uppercase">
+          <div className="text-[10px] sm:text-[11px] font-bold tracking-wider text-neutral-800 uppercase truncate">
             Format
           </div>
-          <div className="text-sm font-medium text-neutral-600 truncate">
-            {selectedFormat ? `${selectedFormat} match` : "5v5, 7v7, 11v11"}
+          <div className="text-xs sm:text-sm font-medium text-neutral-600 truncate">
+            {selectedFormat ? `${selectedFormat} match` : "5v5, 7v7"}
           </div>
         </div>
 

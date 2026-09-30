@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Shield,
   X,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function MyBookings() {
@@ -179,9 +180,14 @@ export default function MyBookings() {
                 <div className="space-y-2">
                   {b.slots?.map((s, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
-                      <span className="font-extrabold text-neutral-900 text-base">
-                        {s.turf_name}
-                      </span>
+                      <Link
+                        to={`/turfs/${s.turf_id}`}
+                        className="font-extrabold text-neutral-900 text-base hover:text-[#16a34a] hover:underline transition inline-flex items-center gap-1.5 group/turf cursor-pointer"
+                        title={`View ${s.turf_name} listing`}
+                      >
+                        <span>{s.turf_name}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover/turf:text-[#16a34a] opacity-0 group-hover/turf:opacity-100 transition" />
+                      </Link>
                       <span className="px-2.5 py-0.5 rounded-md bg-neutral-100 text-neutral-700 font-semibold text-xs">
                         {s.field_name}
                       </span>

@@ -6,7 +6,8 @@ const db = require('../config/db');
  * GET /api/products
  */
 async function listProducts(req, res) {
-  const { category, condition, min_price, max_price, search, seller_id, status, page = 1, limit = 100 } = req.query;
+  const { category, condition, min_price, max_price, search, q, keyword, seller_id, status, page = 1, limit = 100 } = req.query;
+  const searchTerm = search || q || keyword;
 
   try {
     let queryText = `
@@ -44,9 +45,24 @@ async function listProducts(req, res) {
     `;
     const params = [];
 
-    if (category) {
-      params.push(category);
-      queryText += ` AND p.category = $${params.length}`;
+    if (category && category !== 'All Items') {
+      const catLower = category.toLowerCase().trim();
+      if (catLower.includes('boot') || catLower.includes('footwear')) {
+        queryText += ` AND (p.category ILIKE '%boot%' OR p.category ILIKE '%footwear%')`;
+      } else if (catLower.includes('ball')) {
+        queryText += ` AND p.category ILIKE '%ball%'`;
+      } else if (catLower.includes('jersey') || catLower.includes('kit') || catLower.includes('apparel')) {
+        queryText += ` AND (p.category ILIKE '%jersey%' OR p.category ILIKE '%kit%' OR p.category ILIKE '%apparel%')`;
+      } else if (catLower.includes('glove') || catLower.includes('goalkeeper')) {
+        queryText += ` AND (p.category ILIKE '%glove%' OR p.category ILIKE '%goalkeeper%')`;
+      } else if (catLower.includes('train') || catLower.includes('equipment')) {
+        queryText += ` AND (p.category ILIKE '%train%' OR p.category ILIKE '%equipment%')`;
+      } else if (catLower.includes('access')) {
+        queryText += ` AND p.category ILIKE '%access%'`;
+      } else {
+        params.push(`%${category}%`);
+        queryText += ` AND p.category ILIKE $${params.length}`;
+      }
     }
     if (condition) {
       params.push(condition);
@@ -60,9 +76,9 @@ async function listProducts(req, res) {
       params.push(max_price);
       queryText += ` AND p.price <= $${params.length}`;
     }
-    if (search) {
-      params.push(`%${search}%`);
-      queryText += ` AND (p.title ILIKE $${params.length} OR p.description ILIKE $${params.length})`;
+    if (searchTerm) {
+      params.push(`%${searchTerm}%`);
+      queryText += ` AND (p.title ILIKE $${params.length} OR p.description ILIKE $${params.length} OR p.category ILIKE $${params.length})`;
     }
     if (seller_id) {
       params.push(seller_id);
@@ -115,17 +131,17 @@ async function getProduct(req, res) {
         ) AS avg_rating,
         (SELECT COUNT(*)::INT FROM product_reviews pr WHERE pr.product_id = p.product_id) AS review_count,
         (
-          SELECT json_agg(json_build_object('image_id', pi.image_id, 'url', pi.url, 'is_cover', pi.is_cover))
+          SELECT COALESCE(json_agg(json_build_object('image_id', pi.image_id, 'url', pi.url, 'is_cover', pi.is_cover)), '[]'::json)
           FROM product_images pi WHERE pi.product_id = p.product_id
         ) AS images,
         (
-          SELECT json_agg(json_build_object(
+          SELECT COALESCE(json_agg(json_build_object(
             'review_id', pr.review_id,
             'rating', pr.rating,
             'comment', pr.comment,
             'customer_name', cu.name,
             'created_at', pr.created_at
-          ))
+          ) ORDER BY pr.created_at DESC), '[]'::json)
           FROM product_reviews pr
           JOIN orders o ON pr.order_id = o.order_id
           JOIN users cu ON o.customer_id = cu.user_id
@@ -209,7 +225,15 @@ async function updateProduct(req, res) {
              description = COALESCE($6, description)
          WHERE product_id = $7
          RETURNING *`,
-        [title, price, category, condition, stock, description, id]
+        [
+          title !== undefined ? title : null,
+          price !== undefined ? price : null,
+          category !== undefined ? category : null,
+          condition !== undefined ? condition : null,
+          stock !== undefined ? stock : null,
+          description !== undefined ? description : null,
+          id
+        ]
       );
       return rows[0];
     });
@@ -350,6 +374,109 @@ async function setProductCoverImage(req, res) {
   }
 }
 
+/**
+ * GET /api/products/:id/review-eligibility
+ * Checks if logged-in customer can review this product
+ */
+async function getProductReviewEligibility(req, res) {
+  const { id } = req.params;
+
+  try {
+    const { rows: orderRows } = await db.query(
+      `SELECT o.order_id, o.status, o.created_at
+       FROM orders o
+       JOIN order_items oi ON o.order_id = oi.order_id
+       WHERE oi.product_id = $1 AND o.customer_id = $2 AND o.status <> 'cancelled'
+       ORDER BY o.order_id DESC
+       LIMIT 1`,
+      [id, req.user.user_id]
+    );
+
+    if (!orderRows.length) {
+      return res.json({
+        can_review: false,
+        reason: 'Only customers who have ordered this gear can submit a review.',
+        existing_review: null,
+      });
+    }
+
+    const matchedOrder = orderRows[0];
+    const { rows: reviewRows } = await db.query(
+      `SELECT review_id, order_id, product_id, rating, comment, created_at
+       FROM product_reviews
+       WHERE order_id = $1 AND product_id = $2`,
+      [matchedOrder.order_id, id]
+    );
+
+    return res.json({
+      can_review: true,
+      order_id: matchedOrder.order_id,
+      order_status: matchedOrder.status,
+      existing_review: reviewRows[0] || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/products/:id/reviews
+ * Creates or updates review for a purchased product
+ */
+async function createProductReview(req, res) {
+  const { id } = req.params;
+  const { rating, comment, order_id } = req.body;
+
+  const numRating = parseInt(rating, 10);
+  if (!numRating || numRating < 1 || numRating > 5) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 5 stars.' });
+  }
+
+  try {
+    let targetOrderId = order_id;
+
+    if (!targetOrderId) {
+      const { rows } = await db.query(
+        `SELECT o.order_id
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         WHERE oi.product_id = $1 AND o.customer_id = $2 AND o.status <> 'cancelled'
+         ORDER BY o.order_id DESC
+         LIMIT 1`,
+        [id, req.user.user_id]
+      );
+      if (!rows.length) {
+        return res.status(403).json({ error: 'Only verified buyers who have ordered this gear can submit a review.' });
+      }
+      targetOrderId = rows[0].order_id;
+    } else {
+      // Validate customer ownership of provided order_id
+      const { rows } = await db.query(
+        `SELECT o.order_id
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         WHERE o.order_id = $1 AND oi.product_id = $2 AND o.customer_id = $3 AND o.status <> 'cancelled'`,
+        [targetOrderId, id, req.user.user_id]
+      );
+      if (!rows.length) {
+        return res.status(403).json({ error: 'Order not found or unauthorized to review this product.' });
+      }
+    }
+
+    const { rows: inserted } = await db.query(
+      `INSERT INTO product_reviews (order_id, product_id, rating, comment, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (order_id, product_id) DO UPDATE SET rating = $3, comment = $4, created_at = NOW()
+       RETURNING *`,
+      [targetOrderId, id, numRating, comment ? comment.trim() : null]
+    );
+
+    return res.status(201).json(inserted[0]);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
 module.exports = {
   listProducts,
   getProduct,
@@ -359,4 +486,6 @@ module.exports = {
   addProductImage,
   deleteProductImage,
   setProductCoverImage,
+  getProductReviewEligibility,
+  createProductReview,
 };

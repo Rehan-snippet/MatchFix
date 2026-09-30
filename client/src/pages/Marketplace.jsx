@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,15 +17,32 @@ const CATEGORIES = [
 ];
 
 export default function Marketplace() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { addToCart } = useCart();
   const { user } = useAuth();
+
+  const urlCategory = searchParams.get('category');
+  const urlSearch = searchParams.get('search') || searchParams.get('q');
+
   const [products, setProducts] = useState([]);
-  const [q, setQ] = useState('');
-  const [category, setCategory] = useState('All Items');
+  const [q, setQ] = useState(urlSearch || '');
+  const [category, setCategory] = useState(urlCategory || 'All Items');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [wishlist, setWishlist] = useState(new Set());
+
+  // Sync state if URL changes externally (e.g. back/forward navigation)
+  useEffect(() => {
+    const currentUrlCat = searchParams.get('category') || 'All Items';
+    const currentUrlSearch = searchParams.get('search') || searchParams.get('q') || '';
+    if (currentUrlCat !== category) {
+      setCategory(currentUrlCat);
+    }
+    if (currentUrlSearch !== q) {
+      setQ(currentUrlSearch);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -59,28 +76,52 @@ export default function Marketplace() {
   }, [q, category]);
 
   useEffect(() => {
-    if (!hasMore) return;
+    if (!hasMore && page > 1) return;
     setLoading(true);
     const timeout = setTimeout(() => {
       const params = { page, limit: 10 };
-      if (q) params.q = q;
+      if (q) params.search = q;
+      if (category !== 'All Items') params.category = category;
+      
       api
         .get('/products', { params })
         .then((res) => {
-          let list = res.data || [];
-          if (category !== 'All Items') {
-            list = list.filter((p) =>
-              p.category?.toLowerCase().includes(category.toLowerCase()) ||
-              p.title?.toLowerCase().includes(category.toLowerCase())
-            );
-          }
-          if (res.data.length < 10) setHasMore(false);
-          setProducts((prev) => [...prev, ...list]);
+          const list = res.data || [];
+          if (list.length < 10) setHasMore(false);
+          setProducts((prev) => {
+            if (page === 1) return list;
+            const existingIds = new Set(prev.map((item) => item.product_id));
+            const newItems = list.filter((item) => !existingIds.has(item.product_id));
+            return [...prev, ...newItems];
+          });
         })
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(timeout);
   }, [q, category, page]);
+
+  function handleCategorySelect(cat) {
+    setCategory(cat);
+    const nextParams = new URLSearchParams(searchParams);
+    if (cat === 'All Items') {
+      nextParams.delete('category');
+    } else {
+      nextParams.set('category', cat);
+    }
+    setSearchParams(nextParams);
+  }
+
+  function handleSearchChange(val) {
+    setQ(val);
+    const nextParams = new URLSearchParams(searchParams);
+    if (val.trim()) {
+      nextParams.set('search', val);
+    } else {
+      nextParams.delete('search');
+      nextParams.delete('q');
+    }
+    setSearchParams(nextParams);
+  }
 
   function toggleWishlist(e, productId) {
     e.preventDefault();
@@ -108,7 +149,7 @@ export default function Marketplace() {
   return (
     <div className="w-full bg-white pb-20">
       {/* Category Pills Header (Airbnb Category Bar style) */}
-      <div className="sticky top-[73px] z-20 bg-white/95 backdrop-blur-md border-b border-neutral-200/80">
+      <div className="sticky top-20 z-20 bg-white/95 backdrop-blur-md border-b border-neutral-200/80">
         <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
             {CATEGORIES.map((cat) => {
@@ -117,7 +158,7 @@ export default function Marketplace() {
                 <button
                   key={cat}
                   type="button"
-                  onClick={() => setCategory(cat)}
+                  onClick={() => handleCategorySelect(cat)}
                   className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                     active
                       ? 'bg-neutral-900 text-white shadow-xs'
@@ -156,19 +197,19 @@ export default function Marketplace() {
 
           {/* Search Input Box */}
           <div className="w-full md:w-80 relative">
-            <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Search gear, boots, jerseys…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-full border border-neutral-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a] bg-neutral-50/50 transition"
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 rounded-full border border-neutral-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a] bg-neutral-50/50 transition"
             />
           </div>
         </div>
 
         {/* Product Cards Grid */}
-        {loading ? (
+        {loading && page === 1 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="animate-pulse space-y-3">
@@ -190,6 +231,7 @@ export default function Marketplace() {
               onClick={() => {
                 setQ('');
                 setCategory('All Items');
+                setSearchParams({});
               }}
               className="mt-4 px-5 py-2.5 rounded-full bg-[#16a34a] text-white text-xs font-bold shadow-xs hover:bg-[#15803d] transition cursor-pointer"
             >
@@ -242,23 +284,23 @@ export default function Marketplace() {
 
                 {/* Metadata */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <h3 className="font-bold text-sm text-neutral-900 truncate group-hover:text-[#16a34a] transition">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <h3 className="font-bold text-sm text-neutral-900 truncate min-w-0 flex-1 group-hover:text-[#16a34a] transition">
                       {p.title}
                     </h3>
                     {Number(p.avg_rating || p.average_rating) > 0 ? (
-                      <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800 flex-shrink-0">
+                      <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800 shrink-0">
                         <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
                         <span>{Number(p.avg_rating || p.average_rating).toFixed(1)}</span>
                       </div>
                     ) : (
-                      <span className="text-[10px] font-semibold text-neutral-400 flex-shrink-0">New</span>
+                      <span className="text-[10px] font-semibold text-neutral-400 shrink-0">New</span>
                     )}
                   </div>
 
-                  <p className="text-xs text-neutral-500 flex items-center gap-1">
-                    <Store className="w-3 h-3 text-neutral-400" />
-                    <span className="truncate">{p.shop_name}</span>
+                  <p className="text-xs text-neutral-500 flex items-center gap-1 min-w-0">
+                    <Store className="w-3 h-3 text-neutral-400 shrink-0" />
+                    <span className="truncate min-w-0">{p.shop_name}</span>
                   </p>
 
                   <div className="pt-1 flex items-center justify-between gap-1.5">

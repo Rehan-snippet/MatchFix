@@ -1,8 +1,15 @@
 const router = require('express').Router();
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { listSlots, generateSlots } = require('../controllers/slots.controller');
+const {
+  listSlots,
+  getTurfSchedule,
+  generateSlots,
+  toggleSlot,
+} = require('../controllers/slots.controller');
 
 router.get('/', listSlots);
-router.post('/generate', requireAuth, requireRole('organizer'), generateSlots);
+router.get('/schedule', requireAuth, requireRole('organizer', 'admin'), getTurfSchedule);
+router.post('/generate', requireAuth, requireRole('organizer', 'admin'), generateSlots);
+router.post('/toggle', requireAuth, requireRole('organizer', 'admin'), toggleSlot);
 
 module.exports = router;

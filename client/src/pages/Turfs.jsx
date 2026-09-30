@@ -98,13 +98,20 @@ export default function Turfs() {
     setLoading(true);
     const params = { page, limit: 12 };
     if (areaId) params.area_id = areaId;
-    if (keyword) params.keyword = keyword;
+    if (keyword) {
+      params.keyword = keyword;
+      params.search = keyword;
+    }
 
     api
       .get('/turfs', { params })
       .then((res) => {
         if (res.data.length < 12) setHasMore(false);
-        setTurfs((prev) => [...prev, ...res.data]);
+        setTurfs((prev) => {
+          const ids = new Set(prev.map((t) => t.turf_id));
+          const newItems = res.data.filter((t) => !ids.has(t.turf_id));
+          return [...prev, ...newItems];
+        });
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -122,17 +129,29 @@ export default function Turfs() {
       setFilters((prev) => ({
         ...prev,
         formats: cat.filterVal ? [cat.filterVal] : [],
+        surfaces: [],
+        amenities: [],
       }));
     } else if (cat.filterKey === 'surface') {
       setFilters((prev) => ({
         ...prev,
         surfaces: cat.filterVal ? [cat.filterVal] : [],
+        formats: [],
+        amenities: [],
+      }));
+    } else if (cat.filterKey === 'amenity') {
+      setFilters((prev) => ({
+        ...prev,
+        amenities: cat.filterVal ? [cat.filterVal] : [],
+        formats: [],
+        surfaces: [],
       }));
     } else if (cat.id === 'all') {
       setFilters((prev) => ({
         ...prev,
         formats: [],
         surfaces: [],
+        amenities: [],
       }));
     }
   }
@@ -184,9 +203,15 @@ export default function Turfs() {
         if (!desc.includes('locker')) return false;
       }
 
-      if (quickFilter.floodlit || (filters.amenities && filters.amenities.includes('floodlights'))) {
+      if (quickFilter.floodlit || (filters.amenities && (filters.amenities.includes('floodlights') || filters.amenities.includes('floodlit')))) {
         const desc = (t.description || '').toLowerCase();
         if (!desc.includes('floodlit') && !desc.includes('floodlight')) return false;
+      }
+
+      if (filters.amenities && filters.amenities.includes('indoor')) {
+        const desc = (t.description || '').toLowerCase();
+        const name = (t.name || '').toLowerCase();
+        if (!desc.includes('indoor') && !name.includes('indoor')) return false;
       }
 
       return true;
@@ -225,7 +250,7 @@ export default function Turfs() {
         <div className="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-neutral-100 gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
-              {loading
+              {loading && page === 1
                 ? 'Searching available turfs…'
                 : filteredTurfs.length > 0
                 ? `Over ${filteredTurfs.length} ${
@@ -255,7 +280,7 @@ export default function Turfs() {
               mobileView === 'map' ? 'hidden lg:block' : 'block'
             }`}
           >
-            {loading ? (
+            {loading && page === 1 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {[1, 2, 3, 4].map((n) => (
                   <div key={n} className="animate-pulse space-y-3">

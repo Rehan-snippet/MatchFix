@@ -311,14 +311,14 @@ export default function Register() {
               Full name <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <User className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Cristiano Ronaldo"
                 value={form.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
-                className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.name && touched.name
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'
@@ -339,14 +339,14 @@ export default function Register() {
               Email address <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="email"
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 onBlur={() => handleBlur('email')}
-                className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.email && touched.email
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'
@@ -367,14 +367,14 @@ export default function Register() {
               Phone number <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <Phone className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Phone className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="tel"
                 placeholder="017XXXXXXXX"
                 value={form.phone}
                 onChange={(e) => handleChange('phone', e.target.value)}
                 onBlur={() => handleBlur('phone')}
-                className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.phone && touched.phone
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'
@@ -400,13 +400,13 @@ export default function Register() {
                 Default Delivery Address <span className="text-neutral-400 font-normal">(Optional)</span>
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
+                <MapPin className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3 pointer-events-none" />
                 <textarea
                   rows={2}
                   placeholder="House, Road, Area (e.g. Dhanmondi, Dhaka)"
                   value={form.address}
                   onChange={(e) => handleChange('address', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-neutral-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a] transition bg-neutral-50/30"
+                  className="w-full pl-11 pr-4 py-2.5 rounded-2xl border border-neutral-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a] transition bg-neutral-50/30"
                 />
               </div>
             </div>
@@ -429,14 +429,14 @@ export default function Register() {
                   Trade Licence / Business Reg. No. <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <FileText className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <FileText className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="e.g. TL-2026-DHAKA-1029"
                     value={form.trade_licence}
                     onChange={(e) => handleChange('trade_licence', e.target.value)}
                     onBlur={() => handleBlur('trade_licence')}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
+                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
                       errors.trade_licence && touched.trade_licence
                         ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
                         : 'border-neutral-300 focus:ring-2 focus:ring-[#16a34a]'
@@ -456,14 +456,14 @@ export default function Register() {
                   Payout Account Details <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="e.g. bkash: 017XXXXXXXX or Bank Account info"
                     value={form.payout_account}
                     onChange={(e) => handleChange('payout_account', e.target.value)}
                     onBlur={() => handleBlur('payout_account')}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
+                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
                       errors.payout_account && touched.payout_account
                         ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
                         : 'border-neutral-300 focus:ring-2 focus:ring-[#16a34a]'
@@ -497,14 +497,14 @@ export default function Register() {
                   Shop / Merchant Name <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <Store className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Store className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="e.g. Dhaka Sports Gear & Boots"
                     value={form.shop_name}
                     onChange={(e) => handleChange('shop_name', e.target.value)}
                     onBlur={() => handleBlur('shop_name')}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
+                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
                       errors.shop_name && touched.shop_name
                         ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
                         : 'border-neutral-300 focus:ring-2 focus:ring-[#16a34a]'
@@ -524,14 +524,14 @@ export default function Register() {
                   Payout Account Details <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="e.g. bkash / nagad: 017XXXXXXXX or Bank info"
                     value={form.payout_account}
                     onChange={(e) => handleChange('payout_account', e.target.value)}
                     onBlur={() => handleBlur('payout_account')}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
+                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-xs font-semibold focus:outline-none transition bg-white ${
                       errors.payout_account && touched.payout_account
                         ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
                         : 'border-neutral-300 focus:ring-2 focus:ring-[#16a34a]'
@@ -554,14 +554,14 @@ export default function Register() {
               Password <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="At least 6 characters"
                 value={form.password}
                 onChange={(e) => handleChange('password', e.target.value)}
                 onBlur={() => handleBlur('password')}
-                className={`w-full pl-10 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.password && touched.password
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'
@@ -590,14 +590,14 @@ export default function Register() {
               Confirm password <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Re-enter your password"
                 value={form.confirmPassword}
                 onChange={(e) => handleChange('confirmPassword', e.target.value)}
                 onBlur={() => handleBlur('confirmPassword')}
-                className={`w-full pl-10 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.confirmPassword && touched.confirmPassword
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'

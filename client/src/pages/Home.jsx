@@ -86,7 +86,7 @@ export default function Home() {
 
         {/* 3. Section: Popular Turfs in Dhaka (Grid) */}
         <div className="mt-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 sm:gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
                 Popular turfs in Dhaka
@@ -97,7 +97,7 @@ export default function Home() {
             </div>
             <Link
               to="/turfs"
-              className="flex items-center gap-1 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#16a34a] transition"
+              className="flex items-center gap-1 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#16a34a] transition shrink-0 self-start sm:self-auto"
             >
               <span>View all turfs on map</span>
               <ArrowRight className="w-4 h-4" />
@@ -165,7 +165,7 @@ export default function Home() {
         {/* 5. Section: Marketplace Football Gear */}
         {products.length > 0 && (
           <div className="mt-16">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 sm:gap-4 mb-6">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 tracking-tight">
                   Pro gear for matchday
@@ -176,7 +176,7 @@ export default function Home() {
               </div>
               <Link
                 to="/marketplace"
-                className="flex items-center gap-1 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#16a34a] transition"
+                className="flex items-center gap-1 text-xs sm:text-sm font-bold text-neutral-900 hover:text-[#16a34a] transition shrink-0 self-start sm:self-auto"
               >
                 <span>Visit marketplace</span>
                 <ArrowRight className="w-4 h-4" />

@@ -67,14 +67,14 @@ export default function BroadcastBanner() {
       className={`relative z-[60] px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 border-b shadow-xs ${style.bg} ${style.border}`}
     >
       <div className="max-w-[1700px] mx-auto flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 mx-auto text-center truncate sm:text-left">
-          <Icon className="w-4 h-4 flex-shrink-0 animate-pulse" />
-          <span className="truncate">{banner.broadcast_message}</span>
+        <div className="flex items-center justify-center sm:justify-start gap-2.5 min-w-0 flex-1 text-center sm:text-left">
+          <Icon className="w-4 h-4 shrink-0 animate-pulse" />
+          <span className="truncate text-xs sm:text-sm">{banner.broadcast_message}</span>
         </div>
         <button
           type="button"
           onClick={handleDismiss}
-          className="p-1 rounded-lg hover:bg-black/15 transition flex-shrink-0 cursor-pointer"
+          className="p-1 rounded-lg hover:bg-black/15 transition shrink-0 cursor-pointer ml-2"
           title="Dismiss announcement"
           aria-label="Dismiss announcement"
         >

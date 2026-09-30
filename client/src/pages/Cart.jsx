@@ -208,28 +208,28 @@ export default function Cart() {
                     {/* Details */}
                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                       <div>
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-2 min-w-0">
                           <Link
                             to={`/marketplace/${item.product_id}`}
-                            className="font-extrabold text-sm text-neutral-900 hover:text-[#16a34a] transition line-clamp-1"
+                            className="font-extrabold text-sm text-neutral-900 hover:text-[#16a34a] transition line-clamp-1 min-w-0 flex-1"
                           >
                             {item.title}
                           </Link>
                           <button
                             type="button"
                             onClick={() => removeFromCart(item.product_id)}
-                            className="text-neutral-400 hover:text-rose-600 transition p-1 cursor-pointer"
+                            className="text-neutral-400 hover:text-rose-600 transition p-1 cursor-pointer shrink-0"
                             title="Remove item"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
 
-                        <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
-                          <Store className="w-3 h-3 text-neutral-400" />
-                          <span>{item.shop_name}</span>
-                          <span>·</span>
-                          <span className="capitalize">{item.category}</span>
+                        <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5 min-w-0">
+                          <Store className="w-3 h-3 text-neutral-400 shrink-0" />
+                          <span className="truncate min-w-0">{item.shop_name}</span>
+                          <span className="shrink-0">·</span>
+                          <span className="capitalize shrink-0">{item.category}</span>
                         </p>
                       </div>
 
@@ -299,14 +299,14 @@ export default function Cart() {
                     Delivery Address <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <MapPin className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-3" />
+                    <MapPin className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-3 pointer-events-none" />
                     <textarea
                       required
                       rows={2}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="Road, House, Area (e.g. Dhanmondi, Dhaka)"
-                      className="w-full pl-9 pr-3 py-2 text-xs rounded-2xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                      className="w-full pl-10 pr-3 py-2 text-xs rounded-2xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
                     />
                   </div>
                 </div>
@@ -316,13 +316,13 @@ export default function Cart() {
                     Recipient Phone
                   </label>
                   <div className="relative">
-                    <Phone className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="01XXXXXXXXX"
-                      className="w-full pl-9 pr-3 py-2 text-xs rounded-2xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                      className="w-full pl-10 pr-3 py-2 text-xs rounded-2xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
                     />
                   </div>
                 </div>

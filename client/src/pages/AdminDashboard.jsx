@@ -1268,7 +1268,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Modern Navigation Tabs */}
-      <div className="flex items-center gap-2 mb-6 border-b border-neutral-200/80 pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 mb-6 border-b border-neutral-200/80 pb-3 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab('users')}
@@ -1495,7 +1495,7 @@ export default function AdminDashboard() {
             {/* Quick Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search name, email, phone…"
@@ -1504,7 +1504,7 @@ export default function AdminDashboard() {
                     setSearch(e.target.value);
                     setPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                 />
               </div>
 
@@ -1749,7 +1749,7 @@ export default function AdminDashboard() {
             {/* Quick Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search booking #, customer, turf…"
@@ -1758,7 +1758,7 @@ export default function AdminDashboard() {
                     setBookingSearch(e.target.value);
                     setBookingPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                 />
               </div>
 
@@ -1972,7 +1972,7 @@ export default function AdminDashboard() {
             {/* Quick Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search order #, customer, address, item…"
@@ -1981,7 +1981,7 @@ export default function AdminDashboard() {
                     setOrderSearch(e.target.value);
                     setOrderPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                 />
               </div>
 
@@ -2449,7 +2449,7 @@ export default function AdminDashboard() {
               {/* Filters */}
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-60">
-                  <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     placeholder="Search trx, customer, turf, shop…"
@@ -2458,7 +2458,7 @@ export default function AdminDashboard() {
                       setTxSearch(e.target.value);
                       setTxPage(0);
                     }}
-                    className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                    className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                   />
                 </div>
 
@@ -2722,20 +2722,20 @@ export default function AdminDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pendingOrganizers.map((o) => (
-                <div key={o.user_id} className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-extrabold text-sm text-neutral-900">{o.name}</h4>
-                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3" />
-                        <span>{o.email}</span>
+                <div key={o.user_id} className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3 overflow-hidden">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-extrabold text-sm text-neutral-900 truncate" title={o.name}>{o.name}</h4>
+                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5 min-w-0 truncate" title={o.email}>
+                        <Mail className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{o.email}</span>
                       </p>
-                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3" />
-                        <span>{o.phone || 'No phone provided'}</span>
+                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5 min-w-0 truncate">
+                        <Phone className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{o.phone || 'No phone provided'}</span>
                       </p>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="shrink-0 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
                       Pending
                     </span>
                   </div>
@@ -2816,24 +2816,24 @@ export default function AdminDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {pendingSellers.map((s) => (
-                <div key={s.user_id} className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <Store className="w-4 h-4 text-blue-600" />
-                        <h4 className="font-extrabold text-sm text-neutral-900">{s.shop_name}</h4>
+                <div key={s.user_id} className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3 overflow-hidden">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Store className="w-4 h-4 text-blue-600 shrink-0" />
+                        <h4 className="font-extrabold text-sm text-neutral-900 truncate" title={s.shop_name}>{s.shop_name}</h4>
                       </div>
-                      <p className="text-xs text-neutral-500 mt-1">Owner: {s.name}</p>
-                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3" />
-                        <span>{s.email}</span>
+                      <p className="text-xs text-neutral-500 mt-1 truncate">Owner: {s.name}</p>
+                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5 min-w-0 truncate" title={s.email}>
+                        <Mail className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{s.email}</span>
                       </p>
-                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3" />
-                        <span>{s.phone || 'No phone provided'}</span>
+                      <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5 min-w-0 truncate">
+                        <Phone className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{s.phone || 'No phone provided'}</span>
                       </p>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="shrink-0 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
                       Pending
                     </span>
                   </div>
@@ -2892,7 +2892,7 @@ export default function AdminDashboard() {
             {/* Quick Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search arena, area, host…"
@@ -2901,7 +2901,7 @@ export default function AdminDashboard() {
                     setTurfSearch(e.target.value);
                     setTurfPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                 />
               </div>
 
@@ -3172,7 +3172,7 @@ export default function AdminDashboard() {
             {/* Quick Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-56">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search gear, shop, seller…"
@@ -3181,7 +3181,7 @@ export default function AdminDashboard() {
                     setProductSearch(e.target.value);
                     setProductPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-neutral-50/50"
                 />
               </div>
 
@@ -3574,7 +3574,7 @@ export default function AdminDashboard() {
                               commission_rate: Math.min(50, Math.max(0, parseFloat(e.target.value) || 0)),
                             }))
                           }
-                          className="w-12 text-right focus:outline-hidden"
+                          className="w-12 text-right focus:outline-none"
                         />
                         <span className="text-neutral-500">%</span>
                       </div>
@@ -3645,7 +3645,7 @@ export default function AdminDashboard() {
                               advance_percentage: Math.min(100, Math.max(10, parseFloat(e.target.value) || 10)),
                             }))
                           }
-                          className="w-12 text-right focus:outline-hidden"
+                          className="w-12 text-right focus:outline-none"
                         />
                         <span className="text-neutral-500">%</span>
                       </div>
@@ -3719,7 +3719,7 @@ export default function AdminDashboard() {
                           broadcast_enabled: !prev.broadcast_enabled,
                         }))
                       }
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                         settingsForm.broadcast_enabled ? 'bg-emerald-600' : 'bg-neutral-300'
                       }`}
                     >
@@ -3875,7 +3875,7 @@ export default function AdminDashboard() {
                             maintenance_mode: !prev.maintenance_mode,
                           }))
                         }
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                           settingsForm.maintenance_mode ? 'bg-rose-600' : 'bg-neutral-300'
                         }`}
                       >
@@ -3907,7 +3907,7 @@ export default function AdminDashboard() {
                           Support Helpline Phone
                         </label>
                         <div className="relative">
-                          <Phone className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                          <Phone className="w-4 h-4 text-neutral-400 absolute left-3 top-3 pointer-events-none" />
                           <input
                             type="text"
                             value={settingsForm.support_phone}
@@ -3918,7 +3918,7 @@ export default function AdminDashboard() {
                               }))
                             }
                             placeholder="+880 1700-000000"
-                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-hidden focus:border-neutral-900 bg-white"
+                            className="w-full pl-10 pr-3 py-2 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 bg-white"
                           />
                         </div>
                       </div>
@@ -3928,7 +3928,7 @@ export default function AdminDashboard() {
                           Support Email Address
                         </label>
                         <div className="relative">
-                          <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
+                          <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3 pointer-events-none" />
                           <input
                             type="email"
                             value={settingsForm.support_email}
@@ -3939,7 +3939,7 @@ export default function AdminDashboard() {
                               }))
                             }
                             placeholder="support@matchfix.dev"
-                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-hidden focus:border-neutral-900 bg-white"
+                            className="w-full pl-10 pr-3 py-2 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 bg-white"
                           />
                         </div>
                       </div>
@@ -4019,7 +4019,7 @@ export default function AdminDashboard() {
               </button>
 
               <div className="relative flex-1 sm:w-60">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search admin, target ID, details…"
@@ -4028,7 +4028,7 @@ export default function AdminDashboard() {
                     setAuditSearch(e.target.value);
                     setAuditPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50"
                 />
               </div>
 
@@ -4038,7 +4038,7 @@ export default function AdminDashboard() {
                   setAuditActionFilter(e.target.value);
                   setAuditPage(0);
                 }}
-                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
+                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
               >
                 <option value="">All Actions</option>
                 <option value="USER_UPDATE">User Updated</option>
@@ -4071,7 +4071,7 @@ export default function AdminDashboard() {
                   setAuditTargetFilter(e.target.value);
                   setAuditPage(0);
                 }}
-                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
+                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
               >
                 <option value="">All Targets</option>
                 <option value="user">User</option>
@@ -4221,7 +4221,7 @@ export default function AdminDashboard() {
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-60">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search reviewer, arena, product…"
@@ -4230,7 +4230,7 @@ export default function AdminDashboard() {
                     setReviewSearch(e.target.value);
                     setReviewPage(0);
                   }}
-                  className="w-full pl-9 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50"
+                  className="w-full pl-10 pr-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50"
                 />
               </div>
 
@@ -4240,7 +4240,7 @@ export default function AdminDashboard() {
                   setReviewTypeFilter(e.target.value);
                   setReviewPage(0);
                 }}
-                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
+                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
               >
                 <option value="all">All Review Types</option>
                 <option value="turf">Turf Arenas</option>
@@ -4253,7 +4253,7 @@ export default function AdminDashboard() {
                   setReviewRatingFilter(e.target.value);
                   setReviewPage(0);
                 }}
-                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-hidden focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
+                className="px-3 py-2 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:border-neutral-900 bg-neutral-50/50 cursor-pointer"
               >
                 <option value="all">All Star Ratings</option>
                 <option value="5">★★★★★ 5 Stars</option>

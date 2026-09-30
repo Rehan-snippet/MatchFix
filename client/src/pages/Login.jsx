@@ -165,7 +165,7 @@ export default function Login() {
               Email address or Phone number
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 autoComplete="username"
@@ -173,7 +173,7 @@ export default function Login() {
                 value={form.identifier}
                 onChange={(e) => handleChange('identifier', e.target.value)}
                 onBlur={() => handleBlur('identifier')}
-                className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-4 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.identifier && touched.identifier
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'
@@ -198,7 +198,7 @@ export default function Login() {
               </Link>
             </div>
             <div className="relative">
-              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
@@ -206,7 +206,7 @@ export default function Login() {
                 value={form.password}
                 onChange={(e) => handleChange('password', e.target.value)}
                 onBlur={() => handleBlur('password')}
-                className={`w-full pl-10 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
+                className={`w-full pl-11 pr-11 py-3 rounded-2xl border text-sm font-medium focus:outline-none transition bg-neutral-50/30 ${
                   errors.password && touched.password
                     ? 'border-rose-400 focus:ring-2 focus:ring-rose-200 bg-rose-50/20'
                     : 'border-neutral-200 focus:ring-2 focus:ring-[#16a34a] focus:border-[#16a34a]'

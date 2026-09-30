@@ -3,9 +3,13 @@ const { requireAuth } = require('../middleware/auth');
 const {
   getMe,
   updateMe,
+  updatePassword,
   becomeOrganizer,
   becomeSeller,
   becomeCustomer,
+  updateCustomer,
+  updateOrganizer,
+  updateSeller,
   getWishlist,
   addWishlist,
   removeWishlist,
@@ -15,6 +19,7 @@ router.use(requireAuth); // every route below requires a logged-in user
 
 router.get('/me', getMe);
 router.patch('/me', updateMe);
+router.put('/me/password', updatePassword);
 
 router.get('/me/wishlist', getWishlist);
 router.post('/me/wishlist/:productId', addWishlist);
@@ -26,5 +31,9 @@ router.delete('/me/wishlist/:productId', removeWishlist);
 router.post('/me/roles/organizer', becomeOrganizer);
 router.post('/me/roles/seller', becomeSeller);
 router.post('/me/roles/customer', becomeCustomer);
+
+router.patch('/me/roles/customer', updateCustomer);
+router.patch('/me/roles/organizer', updateOrganizer);
+router.patch('/me/roles/seller', updateSeller);
 
 module.exports = router;

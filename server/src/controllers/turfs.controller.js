@@ -6,7 +6,8 @@ const db = require('../config/db');
  * GET /api/turfs
  */
 async function listTurfs(req, res) {
-  const { area_id, min_rate, max_rate, search, organizer_id, status, page = 1, limit = 100 } = req.query;
+  const { area_id, min_rate, max_rate, search, keyword, q, organizer_id, status, page = 1, limit = 100 } = req.query;
+  const searchTerm = search || keyword || q;
 
   try {
     let queryText = `
@@ -40,7 +41,16 @@ async function listTurfs(req, res) {
         ) AS cover_image,
         (
           SELECT COUNT(*)::INT FROM fields f WHERE f.turf_id = t.turf_id
-        ) AS field_count
+        ) AS field_count,
+        (
+          SELECT COALESCE(json_agg(json_build_object(
+            'field_id', f.field_id,
+            'name', f.name,
+            'surface', f.surface,
+            'side_type', f.side_type
+          ) ORDER BY f.field_id), '[]'::json)
+          FROM fields f WHERE f.turf_id = t.turf_id
+        ) AS fields
       FROM turfs t
       JOIN areas a ON t.area_id = a.area_id
       JOIN users u ON t.organizer_id = u.user_id
@@ -60,9 +70,9 @@ async function listTurfs(req, res) {
       params.push(max_rate);
       queryText += ` AND t.hourly_rate <= $${params.length}`;
     }
-    if (search) {
-      params.push(`%${search}%`);
-      queryText += ` AND (t.name ILIKE $${params.length} OR t.address ILIKE $${params.length})`;
+    if (searchTerm) {
+      params.push(`%${searchTerm}%`);
+      queryText += ` AND (t.name ILIKE $${params.length} OR t.address ILIKE $${params.length} OR a.name ILIKE $${params.length})`;
     }
     if (organizer_id) {
       params.push(organizer_id);

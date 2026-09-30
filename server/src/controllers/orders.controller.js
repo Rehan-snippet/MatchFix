@@ -123,7 +123,12 @@ async function listMyOrders(req, res) {
             'title', p.title,
             'qty', oi.qty,
             'unit_price', oi.unit_price,
-            'status', oi.status
+            'status', oi.status,
+            'cover_image', (
+              SELECT pi.url FROM product_images pi
+              WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE
+              LIMIT 1
+            )
           )
         ) AS items,
         (
@@ -168,12 +173,19 @@ async function listOrdersForMyProducts(req, res) {
         o.created_at,
         u.name AS customer_name,
         u.phone AS customer_phone,
+        u.email AS customer_email,
         o.delivery_address,
+        o.delivery_phone,
         oi.product_id,
         p.title AS product_title,
         oi.qty,
         oi.unit_price,
-        oi.status AS item_status
+        oi.status AS item_status,
+        (
+          SELECT pi.url FROM product_images pi
+          WHERE pi.product_id = p.product_id AND pi.is_cover = TRUE
+          LIMIT 1
+        ) AS cover_image
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.order_id
       JOIN products p ON oi.product_id = p.product_id

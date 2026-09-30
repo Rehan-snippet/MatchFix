@@ -48,7 +48,7 @@ export default function Navbar() {
     <>
       <header className="sticky top-0 z-50 bg-white border-b border-neutral-200">
         <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 gap-4">
+          <div className="flex items-center justify-between h-20 gap-2 sm:gap-4 flex-nowrap">
             {/* 1. Left: OG Brand Logo with green Fix */}
             <Link
               to="/"
@@ -61,23 +61,41 @@ export default function Navbar() {
             </Link>
 
             {/* 3. Right: Host actions & User profile capsule */}
-            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-              {/* Host a turf / Organizer link */}
-              <Link
-                to={
-                  user?.roles?.includes("organizer") ? "/organizer" : "/turfs"
-                }
-                className="hidden md:inline-flex text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3.5 py-2.5 rounded-full transition"
-              >
-                {user?.roles?.includes("organizer")
-                  ? "Organizer Studio"
-                  : "Host your turf"}
-              </Link>
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
+              {/* Organizer Studio link */}
+              {user?.roles?.includes("organizer") && (
+                <Link
+                  to="/organizer"
+                  className="hidden md:inline-flex text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3 py-2 rounded-full transition whitespace-nowrap"
+                >
+                  Organizer Studio
+                </Link>
+              )}
+
+              {/* Seller Dashboard link */}
+              {user?.roles?.includes("seller") && (
+                <Link
+                  to="/seller"
+                  className="hidden md:inline-flex text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3 py-2 rounded-full transition whitespace-nowrap"
+                >
+                  Seller Dashboard
+                </Link>
+              )}
+
+              {/* Host your turf link (for users who are neither organizer nor seller) */}
+              {!user?.roles?.includes("organizer") && !user?.roles?.includes("seller") && (
+                <Link
+                  to="/turfs"
+                  className="hidden md:inline-flex text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3 py-2 rounded-full transition whitespace-nowrap"
+                >
+                  Host your turf
+                </Link>
+              )}
 
               {/* Marketplace link */}
               <Link
                 to="/marketplace"
-                className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3.5 py-2.5 rounded-full transition"
+                className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 px-3 py-2 rounded-full transition whitespace-nowrap"
               >
                 <ShoppingBag className="w-3.5 h-3.5 text-neutral-600" />
                 <span>Gear Shop</span>
@@ -87,7 +105,7 @@ export default function Navbar() {
               {user?.is_admin && (
                 <Link
                   to="/admin"
-                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3.5 py-2 rounded-full transition shadow-2xs"
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-full transition shadow-2xs whitespace-nowrap"
                 >
                   <Shield className="w-3.5 h-3.5 text-amber-600" />
                   <span>Admin</span>

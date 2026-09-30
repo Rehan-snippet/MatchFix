@@ -127,21 +127,34 @@ async function listBookingsForMyTurfs(req, res) {
         b.payment_method,
         b.advance_amount,
         b.cash_balance,
+        b.cancel_reason,
         b.created_at,
         u.name AS customer_name,
         u.email AS customer_email,
         u.phone AS customer_phone,
+        t.turf_id,
         t.name AS turf_name,
-        f.name AS field_name,
-        TO_CHAR(bs.slot_date, 'YYYY-MM-DD') AS slot_date,
-        bs.start_time
+        COALESCE(string_agg(DISTINCT f.name, ', '), 'Field') AS field_name,
+        TO_CHAR(MIN(bs.slot_date), 'YYYY-MM-DD') AS slot_date,
+        MIN(bs.start_time) AS start_time,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'field_id', bs.field_id,
+              'field_name', f.name,
+              'slot_date', TO_CHAR(bs.slot_date, 'YYYY-MM-DD'),
+              'start_time', bs.start_time
+            ) ORDER BY bs.slot_date, bs.start_time
+          ) FILTER (WHERE bs.field_id IS NOT NULL), '[]'
+        ) AS slots
       FROM bookings b
       JOIN users u ON b.customer_id = u.user_id
       JOIN booking_slots bs ON b.booking_id = bs.booking_id
       JOIN fields f ON bs.field_id = f.field_id
       JOIN turfs t ON f.turf_id = t.turf_id
       WHERE t.organizer_id = $1
-      ORDER BY bs.slot_date DESC, bs.start_time DESC`,
+      GROUP BY b.booking_id, u.user_id, t.turf_id
+      ORDER BY MIN(bs.slot_date) DESC, MIN(bs.start_time) DESC`,
       [req.user.user_id]
     );
 
@@ -216,14 +229,21 @@ async function cancelBooking(req, res) {
   try {
     await db.withTransaction(async (client) => {
       const { rows } = await client.query(
-        `SELECT customer_id, status FROM bookings WHERE booking_id = $1 FOR UPDATE`,
+        `SELECT b.customer_id, b.status, t.organizer_id
+         FROM bookings b
+         LEFT JOIN booking_slots bs ON b.booking_id = bs.booking_id
+         LEFT JOIN fields f ON bs.field_id = f.field_id
+         LEFT JOIN turfs t ON f.turf_id = t.turf_id
+         WHERE b.booking_id = $1
+         LIMIT 1
+         FOR UPDATE OF b`,
         [id]
       );
 
       if (!rows.length) throw new Error('Booking not found.');
       const booking = rows[0];
 
-      if (!req.user.is_admin && booking.customer_id !== req.user.user_id && !req.user.roles?.includes('organizer')) {
+      if (!req.user.is_admin && booking.customer_id !== req.user.user_id && booking.organizer_id !== req.user.user_id) {
         throw new Error('Unauthorized to cancel this booking.');
       }
       if (booking.status === 'cancelled') throw new Error('Booking is already cancelled.');

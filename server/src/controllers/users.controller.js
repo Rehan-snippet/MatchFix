@@ -43,6 +43,26 @@ const updateMe = asyncHandler(async (req, res) => {
   res.json(user);
 });
 
+// PUT /api/users/me/password — update user password
+const bcrypt = require('bcryptjs');
+const updatePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, 'Current and new passwords are required');
+  }
+
+  const { rows } = await db.query('SELECT password_hash FROM users WHERE user_id = $1', [req.user.user_id]);
+  if (!rows[0]) throw new ApiError(404, 'User not found');
+
+  const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
+  if (!valid) throw new ApiError(400, 'Incorrect current password');
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await db.query('UPDATE users SET password_hash = $1 WHERE user_id = $2', [hashed, req.user.user_id]);
+
+  res.json({ success: true, message: 'Password updated successfully' });
+});
+
 // POST /api/users/me/roles/organizer  { trade_licence, payout_account }
 // Uses explicit transaction control (withTransaction)
 const becomeOrganizer = asyncHandler(async (req, res) => {
@@ -97,6 +117,36 @@ const becomeCustomer = asyncHandler(async (req, res) => {
   res.status(201).json(customer);
 });
 
+const updateCustomer = asyncHandler(async (req, res) => {
+  const { default_address } = req.body;
+  const { rows } = await db.query(
+    `UPDATE customers SET default_address = $1 WHERE user_id = $2 RETURNING *`,
+    [default_address, req.user.user_id]
+  );
+  if (!rows[0]) throw new ApiError(404, 'Customer role not found');
+  res.json(rows[0]);
+});
+
+const updateOrganizer = asyncHandler(async (req, res) => {
+  const { payout_account } = req.body;
+  const { rows } = await db.query(
+    `UPDATE organizers SET payout_account = COALESCE($1, payout_account) WHERE user_id = $2 RETURNING *`,
+    [payout_account, req.user.user_id]
+  );
+  if (!rows[0]) throw new ApiError(404, 'Organizer role not found');
+  res.json(rows[0]);
+});
+
+const updateSeller = asyncHandler(async (req, res) => {
+  const { payout_account } = req.body;
+  const { rows } = await db.query(
+    `UPDATE sellers SET payout_account = COALESCE($1, payout_account) WHERE user_id = $2 RETURNING *`,
+    [payout_account, req.user.user_id]
+  );
+  if (!rows[0]) throw new ApiError(404, 'Seller role not found');
+  res.json(rows[0]);
+});
+
 const getWishlist = asyncHandler(async (req, res) => {
   const { rows } = await db.query(`
     SELECT p.*, pw.created_at as added_at,
@@ -127,4 +177,4 @@ const removeWishlist = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { getMe, updateMe, becomeOrganizer, becomeSeller, becomeCustomer, getWishlist, addWishlist, removeWishlist };
+module.exports = { getMe, updateMe, updatePassword, becomeOrganizer, becomeSeller, becomeCustomer, updateCustomer, updateOrganizer, updateSeller, getWishlist, addWishlist, removeWishlist };

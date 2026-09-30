@@ -215,25 +215,25 @@ export default function TurfDetail() {
           {turf.name}
         </h1>
         <div className="flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm text-neutral-700">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 font-bold text-neutral-900">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+            <span className="flex items-center gap-1 font-bold text-neutral-900 shrink-0">
               <Star className="w-4 h-4 fill-amber-400 stroke-amber-400" />
               <span>{numAverageRating > 0 ? numAverageRating.toFixed(2) : 'New'}</span>
             </span>
-            <span>·</span>
-            <a href="#reviews" className="underline font-semibold cursor-pointer text-neutral-800 hover:text-black">
+            <span className="text-neutral-300">·</span>
+            <a href="#reviews" className="underline font-semibold cursor-pointer text-neutral-800 hover:text-black shrink-0">
               {reviewsCount} {reviewsCount === 1 ? 'review' : 'reviews'}
             </a>
             {isGuestFavorite && (
               <>
-                <span>·</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs">
+                <span className="text-neutral-300">·</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-xs shrink-0">
                   Guest favorite
                 </span>
               </>
             )}
-            <span>·</span>
-            <span className="underline font-medium">
+            <span className="text-neutral-300">·</span>
+            <span className="underline font-medium truncate max-w-[200px] sm:max-w-none">
               {turf.area_name}, Dhaka, Bangladesh
             </span>
           </div>
@@ -415,14 +415,14 @@ export default function TurfDetail() {
         <div className="lg:col-span-5">
           <div className="sticky top-28 bg-white border border-neutral-200 rounded-3xl p-6 shadow-xl space-y-5">
             {/* Price Header */}
-            <div className="flex items-baseline justify-between pb-4 border-b border-neutral-100">
-              <div className="flex items-baseline gap-1">
+            <div className="flex items-baseline justify-between gap-2 flex-wrap pb-4 border-b border-neutral-100">
+              <div className="flex items-baseline gap-1 shrink-0">
                 <span className="text-2xl font-extrabold text-neutral-900">
                   ৳{parseFloat(hourlyRate).toLocaleString()}
                 </span>
                 <span className="text-sm text-neutral-500 font-medium">/ hour</span>
               </div>
-              <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800">
+              <div className="flex items-center gap-1 text-xs font-semibold text-neutral-800 shrink-0">
                 <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400 text-amber-500" />
                 <span>{numAverageRating > 0 ? numAverageRating.toFixed(2) : 'New'}</span>
                 {reviewsCount > 0 && <span className="text-neutral-400 font-normal">({reviewsCount})</span>}

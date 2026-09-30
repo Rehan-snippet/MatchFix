@@ -13,7 +13,9 @@ import {
   Truck,
   CreditCard,
   X,
+  ExternalLink,
 } from 'lucide-react';
+import { getImageUrl } from '../utils/imageUrl';
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
@@ -190,17 +192,31 @@ export default function MyOrders() {
                     key={item.product_id}
                     className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400 flex-shrink-0">
-                        <Package className="w-5 h-5 text-[#16a34a]" />
+                    <Link
+                      to={`/marketplace/${item.product_id}`}
+                      className="flex items-center gap-3.5 group/item cursor-pointer min-w-0 flex-1"
+                    >
+                      <div className="w-13 h-13 rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center text-neutral-400 shrink-0 group-hover/item:border-[#16a34a] transition">
+                        {item.cover_image ? (
+                          <img
+                            src={getImageUrl(item.cover_image)}
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover/item:scale-105 transition duration-200"
+                          />
+                        ) : (
+                          <Package className="w-5 h-5 text-[#16a34a]" />
+                        )}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-neutral-900">{item.title}</h4>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-sm text-neutral-900 group-hover/item:text-[#16a34a] transition flex items-center gap-1.5 min-w-0">
+                          <span className="truncate" title={item.title}>{item.title}</span>
+                          <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover/item:opacity-100 transition shrink-0" />
+                        </h4>
                         <p className="text-xs text-neutral-500">
                           Qty: {item.qty} × ৳{Number(item.unit_price).toLocaleString()}
                         </p>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-center gap-3 self-end sm:self-center">
                       <span

@@ -275,9 +275,9 @@ export default function SandboxPaymentModal({
                       onChange={handleCardNumberChange}
                       placeholder="4242 4242 4242 4242"
                       maxLength={19}
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-neutral-200 font-mono text-xs font-semibold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                      className="w-full pl-11 pr-3.5 py-2.5 rounded-xl border border-neutral-200 font-mono text-xs font-semibold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
                     />
-                    <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <CreditCard className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
 
@@ -306,9 +306,9 @@ export default function SandboxPaymentModal({
                         onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
                         placeholder="123"
                         maxLength={3}
-                        className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-neutral-200 font-mono text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-neutral-200 font-mono text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50"
                       />
-                      <Lock className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Lock className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                   </div>
                 </div>

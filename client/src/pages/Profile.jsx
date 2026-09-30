@@ -14,7 +14,61 @@ import {
   CreditCard,
   MapPin,
   FileText,
+  Edit2,
+  X,
+  Check,
 } from 'lucide-react';
+
+function EditableField({ label, value, endpoint, fieldName, onDone, fallback = 'Not specified' }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || '');
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    if (val === value) return setEditing(false);
+    setBusy(true);
+    try {
+      await api.patch(endpoint, { [fieldName]: val });
+      onDone();
+      setEditing(false);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2 group">
+        <p className="font-semibold text-neutral-800">
+          {value || fallback}
+        </p>
+        <button onClick={() => { setVal(value || ''); setEditing(true); }} className="text-neutral-400 hover:text-[#16a34a] opacity-0 group-hover:opacity-100 transition-opacity">
+          <Edit2 className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <input
+        type="text"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        disabled={busy}
+        className="flex-1 px-2 py-1 text-xs border border-neutral-300 rounded focus:outline-none focus:border-[#16a34a]"
+      />
+      <button onClick={handleSave} disabled={busy} className="p-1 text-white bg-[#16a34a] rounded hover:bg-[#15803d]">
+        <Check className="w-3 h-3" />
+      </button>
+      <button onClick={() => setEditing(false)} disabled={busy} className="p-1 text-neutral-500 bg-neutral-100 rounded hover:bg-neutral-200">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
 
 function RoleForm({ title, icon: Icon, description, fields, endpoint, onDone }) {
   const [values, setValues] = useState(Object.fromEntries(fields.map((f) => [f.name, ''])));
@@ -75,6 +129,108 @@ function RoleForm({ title, icon: Icon, description, fields, endpoint, onDone }) 
           className="w-full py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-98 cursor-pointer"
         >
           {busy ? 'Activating…' : `Activate ${title} Role`}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function EditInfoForm({ user, onDone }) {
+  const [name, setName] = useState(user.name || '');
+  const [phone, setPhone] = useState(user.phone || '');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await api.patch('/users/me', { name, phone });
+      setMessage('Profile updated successfully');
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-neutral-200/90 rounded-3xl p-6 shadow-xs space-y-4">
+      <h3 className="text-lg font-extrabold text-neutral-900">Edit Personal Details</h3>
+      {message && <div className="p-3 rounded-2xl bg-green-50 text-green-700 text-xs font-medium">{message}</div>}
+      {error && <div className="p-3 rounded-2xl bg-rose-50 text-rose-700 text-xs font-medium">{error}</div>}
+      
+      <form onSubmit={handleSubmit} className="space-y-3 pt-2">
+        <div>
+          <label className="block text-xs font-bold text-neutral-700 mb-1">Name</label>
+          <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50" />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-neutral-700 mb-1">Phone</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50" />
+        </div>
+        <button type="submit" disabled={busy} className="w-full py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-98 cursor-pointer">
+          {busy ? 'Saving...' : 'Save Changes'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ChangePasswordForm() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      return setError('New passwords do not match');
+    }
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await api.put('/users/me/password', { currentPassword, newPassword });
+      setMessage('Password updated successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-neutral-200/90 rounded-3xl p-6 shadow-xs space-y-4">
+      <h3 className="text-lg font-extrabold text-neutral-900">Change Password</h3>
+      {message && <div className="p-3 rounded-2xl bg-green-50 text-green-700 text-xs font-medium">{message}</div>}
+      {error && <div className="p-3 rounded-2xl bg-rose-50 text-rose-700 text-xs font-medium">{error}</div>}
+      
+      <form onSubmit={handleSubmit} className="space-y-3 pt-2">
+        <div>
+          <label className="block text-xs font-bold text-neutral-700 mb-1">Current Password</label>
+          <input required type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50" />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-neutral-700 mb-1">New Password</label>
+          <input required type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50" />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-neutral-700 mb-1">Confirm New Password</label>
+          <input required type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl border border-neutral-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#16a34a] bg-neutral-50/50" />
+        </div>
+        <button type="submit" disabled={busy} className="w-full py-2.5 rounded-2xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold shadow-xs transition active:scale-98 cursor-pointer">
+          {busy ? 'Updating...' : 'Update Password'}
         </button>
       </form>
     </div>
@@ -147,6 +303,15 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* Account Settings */}
+      <div className="mb-10">
+        <h3 className="text-lg font-extrabold text-neutral-900 mb-4">Account Settings</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <EditInfoForm user={user} onDone={refreshProfile} />
+          <ChangePasswordForm />
+        </div>
+      </div>
+
       {/* Active Profiles Details */}
       <div className="mb-10">
         <h3 className="text-lg font-extrabold text-neutral-900 mb-4">Active Role Details</h3>
@@ -165,9 +330,12 @@ export default function Profile() {
               </div>
               <div className="text-xs text-neutral-600 space-y-1">
                 <p className="font-medium text-neutral-500">Default Delivery Address:</p>
-                <p className="font-semibold text-neutral-800">
-                  {user.customer.default_address || 'Not specified'}
-                </p>
+                <EditableField
+                  value={user.customer.default_address}
+                  endpoint="/users/me/roles/customer"
+                  fieldName="default_address"
+                  onDone={refreshProfile}
+                />
               </div>
             </div>
           )}
@@ -203,12 +371,15 @@ export default function Profile() {
                     {user.organizer.trade_licence || 'Verified'}
                   </strong>
                 </p>
-                <p className="text-neutral-500">
-                  Payout Account:{' '}
-                  <strong className="text-neutral-800">
-                    {user.organizer.payout_account || 'Default'}
-                  </strong>
-                </p>
+                <div>
+                  <p className="text-neutral-500">Payout Account:</p>
+                  <EditableField
+                    value={user.organizer.payout_account}
+                    endpoint="/users/me/roles/organizer"
+                    fieldName="payout_account"
+                    onDone={refreshProfile}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -242,12 +413,15 @@ export default function Profile() {
                   Shop Name:{' '}
                   <strong className="text-neutral-800">{user.seller.shop_name}</strong>
                 </p>
-                <p className="text-neutral-500">
-                  Payout Account:{' '}
-                  <strong className="text-neutral-800">
-                    {user.seller.payout_account || 'Default'}
-                  </strong>
-                </p>
+                <div>
+                  <p className="text-neutral-500">Payout Account:</p>
+                  <EditableField
+                    value={user.seller.payout_account}
+                    endpoint="/users/me/roles/seller"
+                    fieldName="payout_account"
+                    onDone={refreshProfile}
+                  />
+                </div>
               </div>
             </div>
           )}

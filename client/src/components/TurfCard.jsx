@@ -141,8 +141,8 @@ export default function TurfCard({
         {/* Card Metadata (Airbnb typography & spacing) */}
         <div className="mt-3 flex flex-col gap-0.5 text-left">
           {/* Line 1: Location & Star Rating */}
-          <div className="flex items-center justify-between text-[15px] font-semibold text-neutral-900 leading-snug">
-            <span className="truncate">Turf in {turf.area_name || 'Dhaka'}, Bangladesh</span>
+          <div className="flex items-center justify-between gap-2 text-[15px] font-semibold text-neutral-900 leading-snug min-w-0">
+            <span className="truncate min-w-0 flex-1">Turf in {turf.area_name || 'Dhaka'}, Bangladesh</span>
             <div className="flex items-center gap-1 flex-shrink-0 text-sm font-semibold">
               <Star className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400 text-amber-500" />
               {numericRating > 0 ? (

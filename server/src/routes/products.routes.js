@@ -9,10 +9,14 @@ const {
   deleteProduct,
   addProductImage,
   deleteProductImage,
+  getProductReviewEligibility,
+  createProductReview,
 } = require('../controllers/products.controller');
 
 router.get('/', listProducts);
 router.get('/:id', getProduct);
+router.get('/:id/review-eligibility', requireAuth, getProductReviewEligibility);
+router.post('/:id/reviews', requireAuth, requireRole('customer'), createProductReview);
 
 router.post('/', requireAuth, requireRole('seller'), createProduct);
 router.patch('/:id', requireAuth, requireRole('seller'), updateProduct);
