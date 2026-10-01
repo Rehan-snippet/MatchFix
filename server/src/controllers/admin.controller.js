@@ -1328,17 +1328,19 @@ async function getFinancialSummary(req, res) {
           u.phone AS organizer_phone,
           o.trade_licence,
           o.payout_account,
-          COUNT(DISTINCT b.booking_id)::int AS bookings_count,
+          COUNT(DISTINCT org_bookings.booking_id)::int AS bookings_count,
           COALESCE(SUM(pay.amount), 0)::numeric AS gross_collected,
           ROUND(COALESCE(SUM(pay.amount), 0) * $1, 2)::numeric AS platform_fee,
           ROUND(COALESCE(SUM(pay.amount), 0) * $2, 2)::numeric AS net_payout
         FROM organizers o
         JOIN users u ON o.user_id = u.user_id
-        LEFT JOIN turfs t ON o.user_id = t.organizer_id
-        LEFT JOIN fields f ON t.turf_id = f.turf_id
-        LEFT JOIN booking_slots bs ON f.field_id = bs.field_id
-        LEFT JOIN bookings b ON bs.booking_id = b.booking_id
-        LEFT JOIN payments pay ON b.booking_id = pay.booking_id AND pay.status IN ('completed', 'success')
+        LEFT JOIN (
+          SELECT DISTINCT t.organizer_id, bs.booking_id
+          FROM turfs t
+          JOIN fields f ON t.turf_id = f.turf_id
+          JOIN booking_slots bs ON f.field_id = bs.field_id
+        ) org_bookings ON o.user_id = org_bookings.organizer_id
+        LEFT JOIN payments pay ON org_bookings.booking_id = pay.booking_id AND pay.status IN ('completed', 'success')
         GROUP BY u.user_id, o.trade_licence, o.payout_account
         ORDER BY gross_collected DESC
         LIMIT 50

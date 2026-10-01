@@ -962,6 +962,72 @@ async function runAllPagesTestSuite() {
       const resAllOrd = await req('GET', '/api/admin/orders', null, adminToken);
       check('AdminDashboard: GET /api/admin/orders returns 200', resAllOrd.status === 200);
 
+      // 18.5.1 PATCH /api/admin/bookings/:id/status (Verify updated_at & cancelled_at)
+      if (testBookingId) {
+        const resAdminBkStatus = await req(
+          'PATCH',
+          `/api/admin/bookings/${testBookingId}/status`,
+          { status: 'cancelled', cancel_reason: 'Admin test cancellation' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/bookings/:id/status (cancelled) returns 200', resAdminBkStatus.status === 200);
+        check('AdminDashboard: Booking cancelled_at is populated', !!resAdminBkStatus.data?.booking?.cancelled_at);
+        check('AdminDashboard: Booking updated_at is populated', !!resAdminBkStatus.data?.booking?.updated_at);
+
+        const resAdminBkConfirm = await req(
+          'PATCH',
+          `/api/admin/bookings/${testBookingId}/status`,
+          { status: 'confirmed' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/bookings/:id/status (confirmed) returns 200', resAdminBkConfirm.status === 200);
+      }
+
+      // 18.5.2 PATCH /api/admin/orders/:id/status (Verify updated_at & order revive)
+      if (testOrderId) {
+        const resAdminOrdCancel = await req(
+          'PATCH',
+          `/api/admin/orders/${testOrderId}/status`,
+          { status: 'cancelled' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/orders/:id/status (cancelled) returns 200', resAdminOrdCancel.status === 200);
+        check('AdminDashboard: Order updated_at is populated', !!resAdminOrdCancel.data?.order?.updated_at);
+
+        // Revive cancelled order
+        const resAdminOrdRevive = await req(
+          'PATCH',
+          `/api/admin/orders/${testOrderId}/status`,
+          { status: 'confirmed' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/orders/:id/status (revive from cancelled) returns 200', resAdminOrdRevive.status === 200);
+      }
+
+      // 18.5.3 PATCH /api/admin/turfs/:id/status (Verify updated_at)
+      if (testTurfId) {
+        const resAdminTurfStatus = await req(
+          'PATCH',
+          `/api/admin/turfs/${testTurfId}/status`,
+          { is_active: true, approval_status: 'approved' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/turfs/:id/status returns 200', resAdminTurfStatus.status === 200);
+        check('AdminDashboard: Turf updated_at is populated', !!resAdminTurfStatus.data?.turf?.updated_at);
+      }
+
+      // 18.5.4 PATCH /api/admin/products/:id/status (Verify updated_at)
+      if (testProductId) {
+        const resAdminProdStatus = await req(
+          'PATCH',
+          `/api/admin/products/${testProductId}/status`,
+          { is_active: true, stock: 20, approval_status: 'approved' },
+          adminToken
+        );
+        check('AdminDashboard: PATCH /api/admin/products/:id/status returns 200', resAdminProdStatus.status === 200);
+        check('AdminDashboard: Product updated_at is populated', !!resAdminProdStatus.data?.product?.updated_at);
+      }
+
       // 18.6 Financials
       const resFin = await req('GET', '/api/admin/financials/summary', null, adminToken);
       check('AdminDashboard: GET /api/admin/financials/summary returns 200', resFin.status === 200);

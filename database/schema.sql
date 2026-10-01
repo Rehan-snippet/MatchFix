@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS turfs (
   approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
   rejection_reason TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS turf_images (
@@ -120,7 +121,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   advance_amount NUMERIC(10, 2) DEFAULT 0.00,
   cash_balance NUMERIC(10, 2) DEFAULT 0.00,
   cancel_reason TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  cancelled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS booking_slots (
@@ -153,7 +156,8 @@ CREATE TABLE IF NOT EXISTS products (
   approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
   rejection_reason TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS product_images (
@@ -173,7 +177,8 @@ CREATE TABLE IF NOT EXISTS orders (
   cash_balance NUMERIC(10, 2) DEFAULT 0.00,
   delivery_address TEXT NOT NULL,
   delivery_phone VARCHAR(30),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -245,8 +250,13 @@ CREATE INDEX IF NOT EXISTS idx_payment_intents_booking ON payment_intents(bookin
 CREATE INDEX IF NOT EXISTS idx_payment_intents_order ON payment_intents(order_id) WHERE order_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payment_intents_expires ON payment_intents(expires_at) WHERE status = 'initiated';
 
--- Ensure is_admin column exists on users table for existing databases
+-- Ensure columns exist on existing databases
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE turfs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- Drop old rigid indexes if present
 DROP INDEX IF EXISTS one_active_booking_per_slot;
@@ -306,11 +316,14 @@ DECLARE
 BEGIN
   SELECT ROUND(COALESCE(AVG(tr.rating), 0)::NUMERIC, 2) INTO v_avg
   FROM turf_reviews tr
-  JOIN bookings b ON tr.booking_id = b.booking_id
-  JOIN booking_slots bs ON b.booking_id = bs.booking_id
-  JOIN fields f ON bs.field_id = f.field_id
-  WHERE f.turf_id = p_turf_id
-    AND b.status <> 'cancelled';
+  WHERE tr.booking_id IN (
+    SELECT DISTINCT bs.booking_id
+    FROM booking_slots bs
+    JOIN fields f ON bs.field_id = f.field_id
+    JOIN bookings b ON bs.booking_id = b.booking_id
+    WHERE f.turf_id = p_turf_id
+      AND b.status <> 'cancelled'
+  );
 
   RETURN v_avg;
 END;
@@ -321,12 +334,19 @@ $$ LANGUAGE plpgsql STABLE;
 -- -----------------------------------------------------------------------------
 
 -- Trigger 1: Prevents double-booking while freeing slots when a booking is cancelled
--- Fixes Bug 1
+-- Race-safe with row-level lock on the slots table
 CREATE OR REPLACE FUNCTION fn_check_slot_availability()
 RETURNS TRIGGER AS $$
 DECLARE
   v_conflict_id INT;
 BEGIN
+  -- Acquire an exclusive row lock on the target slot to serialize concurrent booking attempts
+  PERFORM 1 FROM slots
+  WHERE field_id = NEW.field_id
+    AND slot_date = NEW.slot_date
+    AND start_time = NEW.start_time
+  FOR UPDATE;
+
   SELECT bs.booking_id INTO v_conflict_id
   FROM booking_slots bs
   JOIN bookings b ON bs.booking_id = b.booking_id
@@ -390,8 +410,11 @@ BEGIN
   IF OLD.status = 'shipped' AND NEW.status NOT IN ('delivered') THEN
     RAISE EXCEPTION 'Cannot transition order from "shipped" to "%"', NEW.status;
   END IF;
-  IF OLD.status IN ('delivered', 'cancelled') THEN
-    RAISE EXCEPTION 'Order in "%" status cannot be changed', OLD.status;
+  IF OLD.status = 'delivered' THEN
+    RAISE EXCEPTION 'Order in "delivered" status cannot be changed';
+  END IF;
+  IF OLD.status = 'cancelled' AND NEW.status NOT IN ('placed', 'advance_paid', 'confirmed') THEN
+    RAISE EXCEPTION 'Cannot transition order from "cancelled" to "%"', NEW.status;
   END IF;
   RETURN NEW;
 END;
