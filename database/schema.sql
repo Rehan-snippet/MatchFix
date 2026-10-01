@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS turfs (
   description TEXT,
   approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
   rejection_reason TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -151,6 +152,7 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT,
   approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
   rejection_reason TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -190,24 +192,58 @@ CREATE TABLE IF NOT EXISTS product_reviews (
   rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (order_id, product_id) REFERENCES order_items(order_id, product_id) ON DELETE CASCADE
+  FOREIGN KEY (order_id, product_id) REFERENCES order_items(order_id, product_id) ON DELETE CASCADE,
+  CONSTRAINT uq_product_reviews_order_product UNIQUE (order_id, product_id)
 );
 
 CREATE TABLE IF NOT EXISTS payments (
   payment_id SERIAL PRIMARY KEY,
-  booking_id INTEGER REFERENCES bookings(booking_id) ON DELETE SET NULL,
-  order_id INTEGER REFERENCES orders(order_id) ON DELETE SET NULL,
+  booking_id INTEGER REFERENCES bookings(booking_id) ON DELETE CASCADE,
+  order_id INTEGER REFERENCES orders(order_id) ON DELETE CASCADE,
   amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
   method VARCHAR(50) NOT NULL DEFAULT 'card',
-  status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+  status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'success', 'completed', 'failed', 'refunded')),
   purpose VARCHAR(50) NOT NULL DEFAULT 'full',
   is_advance BOOLEAN NOT NULL DEFAULT FALSE,
+  trx_id VARCHAR(100),
+  paid_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT chk_payment_settles_one_target CHECK (
     (booking_id IS NOT NULL AND order_id IS NULL) OR
     (booking_id IS NULL AND order_id IS NOT NULL)
   )
 );
+
+-- Payment Intents for checkout and gateway flows
+CREATE TABLE IF NOT EXISTS payment_intents (
+  intent_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  booking_id INTEGER REFERENCES bookings(booking_id) ON DELETE CASCADE,
+  order_id INTEGER REFERENCES orders(order_id) ON DELETE CASCADE,
+  amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
+  currency VARCHAR(10) NOT NULL DEFAULT 'BDT',
+  method VARCHAR(50) NOT NULL DEFAULT 'sandbox_card',
+  status VARCHAR(20) NOT NULL DEFAULT 'initiated'
+    CHECK (status IN ('initiated', 'processing', 'completed', 'failed', 'expired')),
+  gateway VARCHAR(30) NOT NULL DEFAULT 'sandbox',
+  gateway_ref VARCHAR(200),
+  checkout_url TEXT,
+  sandbox_card VARCHAR(20),
+  error_message TEXT,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 minutes',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  settled_at TIMESTAMPTZ,
+  purpose VARCHAR(50) NOT NULL DEFAULT 'full',
+  CONSTRAINT chk_intent_settles_one CHECK (
+    (booking_id IS NOT NULL AND order_id IS NULL) OR
+    (booking_id IS NULL AND order_id IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_intents_user ON payment_intents(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_booking ON payment_intents(booking_id) WHERE booking_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_intents_order ON payment_intents(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_intents_expires ON payment_intents(expires_at) WHERE status = 'initiated';
 
 -- Ensure is_admin column exists on users table for existing databases
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
@@ -619,3 +655,35 @@ CREATE TABLE IF NOT EXISTS product_wishlist (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id, product_id)
 );
+
+-- -----------------------------------------------------------------------------
+-- 8. Admin Audit Logs
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+  log_id SERIAL PRIMARY KEY,
+  admin_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  action VARCHAR(80) NOT NULL,
+  target_type VARCHAR(50) NOT NULL,
+  target_id VARCHAR(50),
+  details JSONB DEFAULT '{}'::jsonb,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at ON admin_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs(target_type, target_id);
+
+-- -----------------------------------------------------------------------------
+-- 9. Common Query Indexes
+-- -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_turfs_area ON turfs(area_id);
+CREATE INDEX IF NOT EXISTS idx_turfs_active ON turfs(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_slots_field_date ON slots(field_id, slot_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_customer ON bookings(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);

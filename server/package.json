@@ -9,9 +9,10 @@
     "db:create": "node scripts/createDb.js",
     "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/seed.js",
-    "db:seed:dhaka": "node scripts/seedDhaka.js",
-    "db:seed:marketplace": "node scripts/seedMarketplace.js",
-    "db:seed:slots": "node scripts/seedSlots.js"
+    "db:reset": "node scripts/resetDb.js",
+    "admin:create": "node scripts/createAdmin.js",
+    "test": "node scripts/test_all_pages_e2e.js",
+    "test:e2e": "node scripts/test_all_pages_e2e.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
