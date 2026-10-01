@@ -6,6 +6,7 @@ import {
   Mail,
   ArrowRight,
   ShieldCheck,
+  Shield,
   UserCheck,
   Store,
   Trophy,
@@ -91,8 +92,8 @@ export default function Login() {
     }
   }
 
-  function handleQuickFill(email) {
-    setForm({ identifier: email, password: 'Passw0rd!' });
+  function handleQuickFill(email, password = 'Passw0rd!') {
+    setForm({ identifier: email, password });
     setTouched({ identifier: true, password: true });
     setErrors({});
     setServerError('');
@@ -122,30 +123,42 @@ export default function Login() {
               Quick Demo Fill (Pass: Passw0rd!)
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
             <button
               type="button"
-              onClick={() => handleQuickFill('rafi@matchfix.dev')}
+              onClick={() => handleQuickFill('customer.rafi@matchfix.dev', 'Passw0rd!')}
               className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              title="Customer: customer.rafi@matchfix.dev"
             >
               <UserCheck className="w-3 h-3 text-[#16a34a]" />
               Player
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('turfrunners@matchfix.dev')}
+              onClick={() => handleQuickFill('organizer.jaff@matchfix.dev', 'Passw0rd!')}
               className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              title="Organizer: organizer.jaff@matchfix.dev"
             >
               <Trophy className="w-3 h-3 text-[#16a34a]" />
               Organizer
             </button>
             <button
               type="button"
-              onClick={() => handleQuickFill('gearbazaar@matchfix.dev')}
+              onClick={() => handleQuickFill('seller.boots@matchfix.dev', 'Passw0rd!')}
               className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              title="Seller: seller.boots@matchfix.dev"
             >
               <Store className="w-3 h-3 text-[#16a34a]" />
               Seller
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFill('admin@matchfix.dev', 'Passw0rd!')}
+              className="px-2 py-1.5 rounded-xl text-[11px] font-semibold bg-white border border-neutral-200 hover:border-[#16a34a] hover:text-[#16a34a] transition text-neutral-700 shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              title="Admin: admin@matchfix.dev"
+            >
+              <Shield className="w-3 h-3 text-[#16a34a]" />
+              Admin
             </button>
           </div>
         </div>
